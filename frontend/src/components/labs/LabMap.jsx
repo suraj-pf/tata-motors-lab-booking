@@ -4,7 +4,8 @@ import BuildingSection from './BuildingSection'
 import LabFilters from './LabFilters'
 import StatusLegend from './StatusLegend'
 import EnhancedBookingDialog from '../labmap/EnhancedBookingDialog'
-import { Building2, Wrench, ArrowUpDown } from 'lucide-react'
+import BookingReceiptModal from '../booking/BookingReceiptModal'
+import { Building2, Wrench } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const LabMap = ({ labs }) => {
@@ -13,6 +14,8 @@ const LabMap = ({ labs }) => {
   const [filters, setFilters] = useState({ search: '', ac: 'all', sortBy: 'name' })
   const [selectedLab, setSelectedLab] = useState(null)
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false)
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false)
+  const [lastBooking, setLastBooking] = useState(null)
 
   // Sort labs function - DEFINED BEFORE USE
   const sortLabs = (labsList, sortBy) => {
@@ -82,9 +85,14 @@ const LabMap = ({ labs }) => {
   const handleBookingSuccess = (booking) => {
     toast.success('Booking confirmed successfully!')
     setBookingDialogOpen(false)
+    setLastBooking(booking)
+    setReceiptModalOpen(true)
+  }
+
+  const handleCloseReceipt = () => {
+    setReceiptModalOpen(false)
+    setLastBooking(null)
     setSelectedLab(null)
-    // Refresh the labs data or navigate to booking details
-    navigate(`/my-bookings`)
   }
 
   const handleCloseBookingDialog = () => {
@@ -159,14 +167,12 @@ const LabMap = ({ labs }) => {
               title="HR Building"
               labs={filterLabs(buildings['HR Building'])}
               icon={<Building2 size={32} />}
-              onLabSelect={handleLabSelect}
               onBookingClick={handleBookingClick}
             />
             <BuildingSection
               title="SDC Workshop"
               labs={filterLabs(buildings['SDC Workshop'])}
               icon={<Wrench size={32} />}
-              onLabSelect={handleLabSelect}
               onBookingClick={handleBookingClick}
             />
           </>
@@ -175,7 +181,6 @@ const LabMap = ({ labs }) => {
             title={activeBuilding}
             labs={filterLabs(buildings[activeBuilding])}
             icon={activeBuilding === 'HR Building' ? <Building2 size={32} /> : <Wrench size={32} />}
-            onLabSelect={handleLabSelect}
             onBookingClick={handleBookingClick}
           />
         )}
@@ -190,6 +195,12 @@ const LabMap = ({ labs }) => {
           onBookingSuccess={handleBookingSuccess}
         />
       )}
+      {/* Booking Receipt Modal */}
+      <BookingReceiptModal
+        isOpen={receiptModalOpen}
+        booking={lastBooking}
+        onClose={handleCloseReceipt}
+      />
     </div>
   )
 }
