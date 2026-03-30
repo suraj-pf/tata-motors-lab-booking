@@ -1,109 +1,99 @@
 /**
- * Time Utilities - IST (Indian Standard Time) & UTC Standardization
- * All frontend time handling consolidated here
+ * Time Utilities - UTC Internal / IST Display
  * 
- * IST is UTC+5:30
- * Key principle: Store dates in UTC, display in IST
+ * Rules:
+ * - ALL calculations → UTC minutes from midnight
+ * - ALL display → IST 12-hour format
+ * - IST is UTC+5:30
  */
 
-const IST_OFFSET_MS = 330 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+const IST_OFFSET_MINUTES = 330; // 5 hours 30 minutes
+
+// Timeline constants - 6:30 AM to 5:00 PM
+export const START_TIME_MINUTES = 390; // 6:30 AM = 6*60 + 30
+export const END_TIME_MINUTES = 1020; // 5:00 PM = 17*60
+export const TIMELINE_DURATION = END_TIME_MINUTES - START_TIME_MINUTES; // 630 minutes
 
 /**
- * Get current time adjusted to IST
- * @returns {Date} Current time in IST
+ * Get current UTC time in minutes from midnight
  */
-export const getNowIST = () => {
+export const getNowUTCMinutes = () => {
   const now = new Date();
-  // Create IST time by adding offset to UTC
-  return new Date(now.getTime() + IST_OFFSET_MS);
+  return now.getUTCHours() * 60 + now.getUTCMinutes();
 };
 
 /**
- * Get today's date string in IST (YYYY-MM-DD)
- * @returns {string} Today's date in IST
+ * Get current IST time in minutes from midnight
  */
-export const getTodayIST = () => {
-  const ist = getNowIST();
-  return ist.toISOString().split('T')[0];
+export const getNowISTMinutes = () => {
+  const utcMinutes = getNowUTCMinutes();
+  let istMinutes = utcMinutes + IST_OFFSET_MINUTES;
+  if (istMinutes >= 1440) istMinutes -= 1440; // Handle day wrap
+  return istMinutes;
 };
 
 /**
- * Parse date and time to create an IST Date object
- * @param {string} dateStr - Date (YYYY-MM-DD)
- * @param {string} timeStr - Time (HH:MM)
- * @returns {Date} IST Date object
+ * Convert datetime to UTC minutes from midnight
+ * @param {string|Date} datetime - ISO datetime string or Date object
  */
-export const parseISTDateTime = (dateStr, timeStr) => {
-  if (!dateStr || !timeStr) return null;
+export const toUTCMinutes = (datetime) => {
+  if (!datetime) return null;
+  const date = new Date(datetime);
+  if (isNaN(date.getTime())) return null;
+  return date.getUTCHours() * 60 + date.getUTCMinutes();
+};
+
+/**
+ * Convert datetime to IST minutes from midnight
+ * @param {string|Date} datetime - ISO datetime string or Date object
+ */
+export const toISTMinutes = (datetime) => {
+  const utcMinutes = toUTCMinutes(datetime);
+  if (utcMinutes === null) return null;
+  let istMinutes = utcMinutes + IST_OFFSET_MINUTES;
+  if (istMinutes >= 1440) istMinutes -= 1440;
+  return istMinutes;
+};
+
+/**
+ * Format datetime to IST 12-hour display string
+ * @param {string|Date} datetime - ISO datetime string or Date object
+ */
+export const formatIST = (datetime) => {
+  if (!datetime) return '';
+  const date = new Date(datetime);
+  if (isNaN(date.getTime())) return '';
+  
+  return date.toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+/**
+ * Format time (HH:MM) to IST 12-hour display
+ * @param {string} timeStr - Time in HH:MM format
+ */
+export const formatTimeIST = (timeStr) => {
+  if (!timeStr) return '';
   const [hours, minutes] = timeStr.split(':').map(Number);
-  // Parse as UTC first, then adjust
-  const utcDate = new Date(dateStr + 'T00:00:00Z');
-  utcDate.setUTCHours(hours, minutes, 0, 0);
-  // Return as IST (add offset)
-  return new Date(utcDate.getTime() + IST_OFFSET_MS);
-};
-
-/**
- * Check if booking end time is in the past (IST)
- * @param {string} dateStr - Date (YYYY-MM-DD)
- * @param {string} endTimeStr - End time (HH:MM)
- * @returns {boolean}
- */
-export const isPast = (dateStr, endTimeStr) => {
-  const now = getNowIST();
-  const endTime = parseISTDateTime(dateStr, endTimeStr);
-  if (!endTime) return false;
-  return now > endTime;
-};
-
-/**
- * Check if booking is upcoming (end time is in future)
- * @param {string} dateStr - Date (YYYY-MM-DD)
- * @param {string} endTimeStr - End time (HH:MM)
- * @returns {boolean}
- */
-export const isUpcoming = (dateStr, endTimeStr) => {
-  return !isPast(dateStr, endTimeStr);
-};
-
-/**
- * Check if booking is currently ongoing
- * @param {string} dateStr - Date (YYYY-MM-DD)
- * @param {string} startTimeStr - Start time (HH:MM)
- * @param {string} endTimeStr - End time (HH:MM)
- * @returns {boolean}
- */
-export const isOngoing = (dateStr, startTimeStr, endTimeStr) => {
-  const now = getNowIST();
-  const start = parseISTDateTime(dateStr, startTimeStr);
-  const end = parseISTDateTime(dateStr, endTimeStr);
-  if (!start || !end) return false;
-  return now >= start && now <= end;
-};
-
-/**
- * Get booking status classification
- * @param {Object} booking - { booking_date, start_time, end_time, status }
- * @returns {string} 'upcoming' | 'ongoing' | 'completed' | 'cancelled'
- */
-export const getBookingStatus = (booking) => {
-  if (booking.status === 'cancelled') return 'cancelled';
+  if (isNaN(hours) || isNaN(minutes)) return '';
   
-  const now = getNowIST();
-  const start = parseISTDateTime(booking.booking_date, booking.start_time);
-  const end = parseISTDateTime(booking.booking_date, booking.end_time);
-  
-  if (!start || !end) return 'unknown';
-
-  if (now > end) return 'completed';
-  if (now >= start && now <= end) return 'ongoing';
-  return 'upcoming';
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date.toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
 };
 
 /**
  * Format date for display (IST)
  * @param {string} dateStr - Date (YYYY-MM-DD)
- * @returns {string} Formatted date
  */
 export const formatDateIST = (dateStr) => {
   if (!dateStr) return '';
@@ -118,37 +108,109 @@ export const formatDateIST = (dateStr) => {
 };
 
 /**
- * Format time for display (IST)
+ * Get today's date string in IST (YYYY-MM-DD)
+ */
+export const getTodayIST = () => {
+  const now = new Date();
+  const istDate = new Date(now.getTime() + IST_OFFSET_MINUTES * 60 * 1000);
+  return istDate.toISOString().split('T')[0];
+};
+
+/**
+ * Parse date and time to create UTC minutes
+ * @param {string} dateStr - Date (YYYY-MM-DD)
  * @param {string} timeStr - Time (HH:MM)
- * @returns {string} Formatted time (e.g., "02:30 PM")
  */
-export const formatTimeIST = (timeStr) => {
-  if (!timeStr) return '';
+export const parseToUTCMinutes = (dateStr, timeStr) => {
+  if (!dateStr || !timeStr) return null;
   const [hours, minutes] = timeStr.split(':').map(Number);
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
-  return date.toLocaleTimeString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  });
+  if (isNaN(hours) || isNaN(minutes)) return null;
+  return hours * 60 + minutes;
 };
 
 /**
- * Get current time position for timeline (minutes from midnight IST)
- * @returns {number} Minutes from midnight
+ * Check if current time is within timeline bounds
  */
-export const getCurrentTimeMinutes = () => {
-  const now = getNowIST();
-  return now.getHours() * 60 + now.getMinutes();
+export const isCurrentTimeInTimeline = () => {
+  const istMinutes = getNowISTMinutes();
+  return istMinutes >= START_TIME_MINUTES && istMinutes <= END_TIME_MINUTES;
 };
 
 /**
- * Compare two dates (IST)
+ * Get current time position percentage within timeline (0-100)
+ * Returns -1 if outside bounds
+ */
+export const getCurrentTimePosition = () => {
+  if (!isCurrentTimeInTimeline()) return -1;
+  const istMinutes = getNowISTMinutes();
+  return ((istMinutes - START_TIME_MINUTES) / TIMELINE_DURATION) * 100;
+};
+
+/**
+ * Generate timeline slots for display (hourly from 6:30 AM to 5:00 PM)
+ * @returns {Array} Array of {time, minutes, label} objects
+ */
+export const generateTimelineSlots = () => {
+  const slots = [];
+  // Start at 6:30, then hourly until 17:00
+  slots.push({ time: '06:30', minutes: 390, label: formatTimeIST('06:30') });
+  
+  for (let hour = 7; hour <= 17; hour++) {
+    const timeStr = `${String(hour).padStart(2, '0')}:00`;
+    slots.push({
+      time: timeStr,
+      minutes: hour * 60,
+      label: formatTimeIST(timeStr)
+    });
+  }
+  return slots;
+};
+
+/**
+ * Check if booking is currently ongoing (not cancelled, time overlaps now)
+ * @param {Object} booking - { booking_date, start_time, end_time, status }
+ */
+export const isBookingOngoing = (booking) => {
+  if (booking.status === 'cancelled') return false;
+  
+  const today = getTodayIST();
+  if (booking.booking_date !== today) return false;
+  
+  const nowIST = getNowISTMinutes();
+  const startIST = toISTMinutes(new Date(`${booking.booking_date}T${booking.start_time}`));
+  const endIST = toISTMinutes(new Date(`${booking.booking_date}T${booking.end_time}`));
+  
+  if (startIST === null || endIST === null) return false;
+  return nowIST >= startIST && nowIST <= endIST;
+};
+
+/**
+ * Get booking status classification
+ * @param {Object} booking - { booking_date, start_time, end_time, status }
+ */
+export const getBookingStatus = (booking) => {
+  if (booking.status === 'cancelled') return 'cancelled';
+  
+  const today = getTodayIST();
+  const nowIST = getNowISTMinutes();
+  const endIST = toISTMinutes(new Date(`${booking.booking_date}T${booking.end_time}`));
+  const startIST = toISTMinutes(new Date(`${booking.booking_date}T${booking.start_time}`));
+  
+  if (endIST === null || startIST === null) return 'unknown';
+  
+  if (booking.booking_date < today || (booking.booking_date === today && nowIST > endIST)) {
+    return 'completed';
+  }
+  if (booking.booking_date === today && nowIST >= startIST && nowIST <= endIST) {
+    return 'ongoing';
+  }
+  return 'upcoming';
+};
+
+/**
+ * Compare two dates
  * @param {string} dateA - Date 1 (YYYY-MM-DD)
  * @param {string} dateB - Date 2 (YYYY-MM-DD)
- * @returns {number} -1, 0, 1
  */
 export const compareDates = (dateA, dateB) => {
   const d1 = new Date(dateA + 'T00:00:00');
@@ -161,52 +223,29 @@ export const compareDates = (dateA, dateB) => {
 /**
  * Check if date is today (IST)
  * @param {string} dateStr - Date (YYYY-MM-DD)
- * @returns {boolean}
  */
 export const isToday = (dateStr) => {
   return dateStr === getTodayIST();
 };
 
-/**
- * Convert IST Date to UTC ISO string for API calls
- * @param {Date} istDate - Date in IST
- * @returns {string} UTC ISO string
- */
-export const toUTCISOString = (istDate) => {
-  const utcTime = new Date(istDate.getTime() - IST_OFFSET_MS);
-  return utcTime.toISOString();
-};
-
 export default {
-  getNowIST,
-  getTodayIST,
-  parseISTDateTime,
-  isPast,
-  isUpcoming,
-  isOngoing,
-  getBookingStatus,
-  formatDateIST,
+  getNowUTCMinutes,
+  getNowISTMinutes,
+  toUTCMinutes,
+  toISTMinutes,
+  formatIST,
   formatTimeIST,
-  getCurrentTimeMinutes,
+  formatDateIST,
+  getTodayIST,
+  parseToUTCMinutes,
+  isCurrentTimeInTimeline,
+  getCurrentTimePosition,
+  generateTimelineSlots,
+  isBookingOngoing,
+  getBookingStatus,
   compareDates,
   isToday,
-  toUTCISOString
-};
-  return utcTime.toISOString();
-};
-
-export default {
-  getNowIST,
-  getTodayIST,
-  parseISTDateTime,
-  isPast,
-  isUpcoming,
-  isOngoing,
-  getBookingStatus,
-  formatDateIST,
-  formatTimeIST,
-  getCurrentTimeMinutes,
-  compareDates,
-  isToday,
-  toUTCISOString
+  START_TIME_MINUTES,
+  END_TIME_MINUTES,
+  TIMELINE_DURATION
 };

@@ -3,6 +3,15 @@ import { Calendar, Clock, Users, Filter, RefreshCw, X, MapPin, User, FileText } 
 import { useTimeline } from '../../hooks/useTimeline';
 import LiveStatusBadge from '../labmap/LiveStatusBadge';
 import toast from 'react-hot-toast';
+import { 
+  getTodayIST, 
+  getNowISTMinutes, 
+  formatTimeIST,
+  formatDateIST,
+  START_TIME_MINUTES,
+  END_TIME_MINUTES,
+  TIMELINE_DURATION
+} from '../../utils/time';
 
 // Booking Detail Modal Component
 const BookingModal = ({ booking, isOpen, onClose }) => {
@@ -44,12 +53,7 @@ const BookingModal = ({ booking, isOpen, onClose }) => {
                 {booking.start_time?.slice(0, 5)} - {booking.end_time?.slice(0, 5)}
               </p>
               <p className="text-sm text-gray-500">
-                {new Date(booking.booking_date).toLocaleDateString('en-IN', { 
-                  weekday: 'short', 
-                  year: 'numeric', 
-                  month: 'short', 
-                  day: 'numeric' 
-                })}
+                {formatDateIST(booking.booking_date)}
               </p>
             </div>
           </div>
@@ -102,11 +106,8 @@ const TimelineView = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [highlightedBookingId, setHighlightedBookingId] = useState(null);
   
-  // PRODUCTION: Current time with live updates
-  const [currentTimeMinutes, setCurrentTimeMinutes] = useState(() => {
-    const now = new Date();
-    return now.getHours() * 60 + now.getMinutes();
-  });
+  // Current time in IST minutes for red line positioning
+  const [currentTimeMinutes, setCurrentTimeMinutes] = useState(() => getNowISTMinutes());
   
   // Refs for scrolling
   const timelineRef = useRef(null);
@@ -135,8 +136,7 @@ const TimelineView = () => {
     let interval;
     
     const updateCurrentTime = () => {
-      const now = new Date();
-      setCurrentTimeMinutes(now.getHours() * 60 + now.getMinutes());
+      setCurrentTimeMinutes(getNowISTMinutes());
     };
     
     // Update every minute
@@ -216,12 +216,9 @@ const TimelineView = () => {
   const calculateBookingStyle = useCallback((booking) => {
     const startMinutes = timeToMinutes(booking.start_time);
     const endMinutes = timeToMinutes(booking.end_time);
-    const dayStartMinutes = timeToMinutes('06:30');
-    const dayEndMinutes = timeToMinutes('17:30');
     
-    const totalMinutes = dayEndMinutes - dayStartMinutes;
-    const leftOffset = ((startMinutes - dayStartMinutes) / totalMinutes) * 100;
-    const width = ((endMinutes - startMinutes) / totalMinutes) * 100;
+    const leftOffset = ((startMinutes - START_TIME_MINUTES) / TIMELINE_DURATION) * 100;
+    const width = ((endMinutes - startMinutes) / TIMELINE_DURATION) * 100;
     
     return {
       left: `${leftOffset}%`,
@@ -229,16 +226,13 @@ const TimelineView = () => {
     };
   }, [timeToMinutes]);
 
-  // PRODUCTION: Memoize current time position
+  // Calculate current time position for red line (only for today)
   const currentTimePosition = useMemo(() => {
-    if (selectedDate !== new Date().toISOString().split('T')[0]) return null;
+    if (selectedDate !== getTodayIST()) return null;
+    if (currentTimeMinutes < START_TIME_MINUTES || currentTimeMinutes > END_TIME_MINUTES) return null;
     
-    const dayStartMinutes = timeToMinutes('06:30');
-    const dayEndMinutes = timeToMinutes('17:30');
-    const totalMinutes = dayEndMinutes - dayStartMinutes;
-    
-    return ((currentTimeMinutes - dayStartMinutes) / totalMinutes) * 100;
-  }, [currentTimeMinutes, selectedDate, timeToMinutes]);
+    return ((currentTimeMinutes - START_TIME_MINUTES) / TIMELINE_DURATION) * 100;
+  }, [currentTimeMinutes, selectedDate]);
 
   // PRODUCTION: Memoize booking styles to prevent re-renders
   const bookingStyles = useMemo(() => {
@@ -259,17 +253,14 @@ const TimelineView = () => {
       if (storedTime) {
         // Scroll to specific time from redirect
         const targetMinutes = timeToMinutes(storedTime);
-        const dayStartMinutes = timeToMinutes('06:30');
-        const dayEndMinutes = timeToMinutes('17:30');
-        const totalMinutes = dayEndMinutes - dayStartMinutes;
-        const position = ((targetMinutes - dayStartMinutes) / totalMinutes) * 100;
+        const position = ((targetMinutes - START_TIME_MINUTES) / TIMELINE_DURATION) * 100;
         
         const container = containerRef.current;
         const scrollLeft = (position / 100) * container.scrollWidth - container.clientWidth / 2;
         container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
         
         sessionStorage.removeItem('timelineScrollTarget');
-      } else if (selectedDate === new Date().toISOString().split('T')[0] && currentTimePosition !== null) {
+      } else if (selectedDate === getTodayIST() && currentTimePosition !== null) {
         // Scroll to current time
         const container = containerRef.current;
         const scrollLeft = (currentTimePosition / 100) * container.scrollWidth - container.clientWidth / 2;
@@ -300,14 +291,8 @@ const TimelineView = () => {
     }
   };
 
-  // Format time for display
-  const formatTime = (time) => {
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
+  // Format time for display (IST 12-hour format)
+  const formatTime = (time) => formatTimeIST(time);
 
   // Initialize timeline on mount
   useEffect(() => {
@@ -354,7 +339,7 @@ const TimelineView = () => {
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Lab Booking Timeline</h2>
             <p className="text-gray-600 mt-1">
-              Real-time view of all lab bookings for {new Date(selectedDate).toLocaleDateString()}
+              Real-time view of all lab bookings for {formatDateIST(selectedDate)}
             </p>
           </div>
           
@@ -366,7 +351,7 @@ const TimelineView = () => {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => handleDateChange(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={getTodayIST()}
                 max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
@@ -463,7 +448,7 @@ const TimelineView = () => {
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50">
                                 <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-xl whitespace-nowrap">
                                   <p className="font-medium">{booking.user_name}</p>
-                                  <p>{booking.start_time?.slice(0, 5)} - {booking.end_time?.slice(0, 5)}</p>
+                                  <p>{formatTimeIST(booking.start_time)} - {formatTimeIST(booking.end_time)}</p>
                                   {booking.purpose && <p className="text-gray-300 mt-1">{booking.purpose}</p>}
                                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
                                 </div>

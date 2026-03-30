@@ -2,28 +2,15 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import api from '../api/axios';
 import { useSocket } from './useSocket';
 import toast from 'react-hot-toast';
-
-// Utility: Parse local time string to Date object (treat as local time, not UTC)
-const parseLocalTime = (dateStr, timeStr) => {
-  if (!dateStr || !timeStr) return null;
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const date = new Date(dateStr + 'T00:00:00');
-  date.setHours(hours, minutes, 0, 0);
-  return date;
-};
-
-// Utility: Get current local time
-const getCurrentLocalTime = () => new Date();
-
-// Utility: Convert UTC to local time string for display
-const formatLocalTime = (utcDate) => {
-  if (!utcDate) return '';
-  return utcDate.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: true 
-  });
-};
+import { 
+  getTodayIST, 
+  getNowISTMinutes, 
+  toISTMinutes,
+  formatTimeIST,
+  START_TIME_MINUTES,
+  END_TIME_MINUTES,
+  TIMELINE_DURATION
+} from '../utils/time';
 
 // Utility: Deduplicate bookings by ID, keeping newest
 const deduplicateBookings = (bookings) => {
@@ -37,7 +24,7 @@ const deduplicateBookings = (bookings) => {
   return Array.from(seen.values());
 };
 
-// Utility: Sort bookings by start time (UTC)
+// Utility: Sort bookings by start time
 const sortBookingsByTime = (bookings) => {
   return [...bookings].sort((a, b) => {
     const timeA = (a.start_time || '').replace(':', '');
@@ -58,22 +45,14 @@ export const useTimeline = () => {
   const debounceTimer = useRef(null);
   const pendingUpdates = useRef([]);
   
-  // Generate time slots for timeline (06:30 AM - 05:30 PM)
+  // Generate time slots for timeline - IST 6:30 AM to 5:00 PM
   const generateTimeSlots = useCallback(() => {
     const slots = [];
-    const startHour = 6;
-    const endHour = 18;
+    // Start at 6:30, then hourly until 17:00
+    slots.push('06:30');
     
-    for (let hour = startHour; hour < endHour; hour++) {
-      if (hour === 6) {
-        slots.push(`${hour.toString().padStart(2, '0')}:30`);
-      } else if (hour < 18) {
-        slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      }
-      
-      if (hour < 17) {
-        slots.push(`${hour.toString().padStart(2, '0')}:30`);
-      }
+    for (let hour = 7; hour <= 17; hour++) {
+      slots.push(`${String(hour).padStart(2, '0')}:00`);
     }
     
     return slots;
@@ -171,23 +150,31 @@ export const useTimeline = () => {
     }
   }, [selectedDate]);
   
-  // PRODUCTION-GRADE: Get booking state using LOCAL time (not UTC)
+  // Get booking state using IST time calculations
   const getBookingState = useCallback((booking) => {
-    const now = getCurrentLocalTime();
-    const bookingStart = parseLocalTime(booking.booking_date, booking.start_time);
-    const bookingEnd = parseLocalTime(booking.booking_date, booking.end_time);
+    const nowISTMinutes = getNowISTMinutes();
+    const startISTMinutes = toISTMinutes(new Date(`${booking.booking_date}T${booking.start_time}`));
+    const endISTMinutes = toISTMinutes(new Date(`${booking.booking_date}T${booking.end_time}`));
     
-    if (!bookingStart || !bookingEnd) return 'unknown';
+    if (startISTMinutes === null || endISTMinutes === null) return 'unknown';
     
     if (booking.status === 'cancelled') {
       return 'cancelled';
     }
     
-    if (now >= bookingStart && now < bookingEnd) {
+    // Check if booking is on a different date
+    const todayIST = getTodayIST();
+    if (booking.booking_date !== todayIST) {
+      // Past date = completed, Future date = future
+      return booking.booking_date < todayIST ? 'past' : 'future';
+    }
+    
+    // Same date - check time
+    if (nowISTMinutes >= startISTMinutes && nowISTMinutes < endISTMinutes) {
       return 'active';
     }
     
-    if (now < bookingStart) {
+    if (nowISTMinutes < startISTMinutes) {
       return 'future';
     }
     
@@ -298,8 +285,5 @@ export const useTimeline = () => {
     getBookingsByLab,
     getBookingState,
     setSelectedDate,
-    // Expose utilities for components
-    parseUTCTime,
-    formatLocalTime,
   };
 };
