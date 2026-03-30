@@ -1,0 +1,14 @@
+const express = require('express');
+const { register, login, refreshToken, getProfile, updateProfile, changePassword } = require('../controllers/authController');
+const { authMiddleware } = require('../shared/middleware/auth');
+const { loginLimiter, createAccountLimiter } = require('../shared/middleware/rateLimiter');
+const router = express.Router();
+
+router.post('/register', createAccountLimiter, register);
+router.post('/login', login);
+router.post('/refresh', refreshToken);
+router.get('/profile', authMiddleware, getProfile);
+router.put('/profile', authMiddleware, updateProfile);
+router.post('/change-password', authMiddleware, changePassword);
+
+module.exports = router;

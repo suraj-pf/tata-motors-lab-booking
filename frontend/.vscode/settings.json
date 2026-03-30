@@ -1,0 +1,27 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "css.lint.validProperties": [
+    "scrollbar-width",
+    "scrollbar-color",
+    "scroll-behavior",
+    "-webkit-overflow-scrolling",
+    "-webkit-scrollbar-width",
+    "-webkit-scrollbar-track",
+    "-webkit-scrollbar-thumb"
+  ],
+  "css.validate": false,
+  "stylelint.enable": false,
+  "tailwindCSS.includeLanguages": {
+    "javascript": "javascript",
+    "javascriptreact": "javascriptreact",
+    "typescript": "typescript",
+    "typescriptreact": "typescriptreact"
+  },
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+  "tailwindCSS.experimental.classRegex": [
+    ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
+    ["cx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]
+  ]
+}

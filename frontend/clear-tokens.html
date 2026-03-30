@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Local Storage</title>
+</head>
+<body>
+    <h1>Clear Local Storage</h1>
+    <p>Click the button below to clear all authentication tokens from local storage.</p>
+    <button onclick="clearTokens()">Clear Tokens</button>
+    <div id="result"></div>
+    
+    <script>
+        function clearTokens() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            document.getElementById('result').innerHTML = 
+                '<p style="color: green;">Tokens cleared! Please refresh the main application and login again.</p>';
+        }
+    </script>
+</body>
+</html>

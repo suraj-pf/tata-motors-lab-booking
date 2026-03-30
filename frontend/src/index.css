@@ -1,0 +1,236 @@
+@import './styles/globals.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply m-0 p-0 box-border;
+  }
+
+  body {
+    @apply font-sans antialiased min-h-screen;
+    background: linear-gradient(135deg, #F2E8CF 0%, #fff 100%);
+  }
+}
+
+@layer components {
+  .tata-btn {
+    @apply bg-gradient-to-r from-tata-red to-tata-red-dark text-white font-semibold 
+           px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 
+           transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-tata-red focus:ring-opacity-50;
+  }
+
+  .tata-btn-secondary {
+    @apply bg-gradient-to-r from-teal to-teal-light text-white font-semibold 
+           px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 
+           transition-all duration-300;
+  }
+
+  .tata-card {
+    @apply bg-white/95 backdrop-blur-xl rounded-2xl border border-white/30 
+           shadow-xl hover:shadow-2xl transition-all duration-300;
+  }
+
+  .lab-available {
+    @apply border-2 border-teal bg-gradient-to-br from-teal/5 to-transparent;
+  }
+
+  .lab-booked {
+    @apply border-2 border-tata-red bg-gradient-to-br from-tata-red/5 to-transparent opacity-70;
+  }
+
+  /* Timeline specific styles */
+  .timeline-grid {
+    @apply bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200;
+  }
+
+  .timeline-row {
+    @apply flex border-t border-gray-200 min-h-16;
+  }
+
+  /* Custom scrollbar styles for both axes */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) rgb(241 245 249);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgb(241 245 249);
+    border-radius: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgb(203 213 225);
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgb(148 163 184);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-corner {
+    background: rgb(241 245 249);
+  }
+
+  /* Enhanced scroll container */
+  .scroll-container {
+    overflow: auto;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+  }
+
+  /* Scroll indicator animations */
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .scroll-indicator {
+    animation: fadeInScale 0.2s ease-out;
+  }
+
+  /* Enhanced scroll indicators with hover effects */
+  .scroll-indicator:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  /* Scroll hint pulse animation */
+  @keyframes scrollHint {
+    0%, 100% {
+      opacity: 0.6;
+      transform: translateY(0);
+    }
+    50% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
+
+  .scroll-hint {
+    animation: scrollHint 2s infinite;
+  }
+
+  /* Smooth scroll animations */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Timeline animation classes */
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .timeline-row-animate {
+    animation: slideInLeft 0.3s ease-out forwards;
+  }
+
+  .booking-bar-animate {
+    animation: slideInUp 0.3s ease-out forwards;
+  }
+
+  /* Current time line animation */
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .current-time-pulse {
+    animation: pulse 2s infinite;
+  }
+
+  .timeline-cell {
+    @apply relative border-r border-gray-200 transition-colors cursor-pointer;
+  }
+
+  .timeline-cell:last-child {
+    @apply border-r-0;
+  }
+
+  .timeline-cell.booked {
+    @apply bg-red-50;
+  }
+
+  .timeline-cell.available {
+    @apply bg-green-50;
+  }
+
+  .timeline-cell:hover {
+    @apply bg-blue-50;
+  }
+
+  .booking-bar {
+    @apply absolute top-1 bottom-1 bg-red-600 rounded-md shadow-sm cursor-pointer 
+           hover:shadow-md transition-all z-10 min-w-[60px];
+  }
+
+  .booking-bar:hover {
+    @apply transform scale-y-105;
+  }
+
+  .timeline-tooltip {
+    @apply absolute z-50 bg-gray-900 text-white text-sm rounded-lg shadow-xl p-3 
+           max-w-xs pointer-events-none;
+  }
+
+  .time-slot-header {
+    @apply text-center py-3 text-sm font-medium text-gray-600 border-r border-gray-200;
+  }
+
+  .lab-info-cell {
+    @apply w-48 flex-shrink-0 p-3 bg-gray-50 border-r border-gray-200;
+  }
+
+  .timeline-controls {
+    @apply flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow-sm;
+  }
+
+  .view-toggle-btn {
+    @apply px-4 py-2 rounded-lg font-medium transition flex items-center;
+  }
+
+  .view-toggle-btn.active {
+    @apply bg-red-600 text-white shadow-md;
+  }
+
+  .view-toggle-btn.inactive {
+    @apply bg-white text-gray-700 hover:bg-gray-100 border border-gray-200;
+  }
+}
