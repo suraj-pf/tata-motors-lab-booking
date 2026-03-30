@@ -37,8 +37,8 @@ const getAllUsers = async (req, res) => {
       total: users.length
     });
   } catch (error) {
-    console.error('Get all users error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Get all users error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -53,7 +53,8 @@ const createUser = async (req, res) => {
     );
     
     if (existingUser.length > 0) {
-      return res.status(400).json({ error: 'Username already exists' });
+      console.log(`[ADMIN] User creation failed: username ${username} already exists`);
+      return res.status(400).json({ success: false, message: 'Username already exists' });
     }
     
     // Hash password
@@ -69,10 +70,11 @@ const createUser = async (req, res) => {
       [result.insertId]
     );
     
+    console.log(`[ADMIN] User created: ${newUser[0].username} (ID: ${newUser[0].id})`);
     res.status(201).json({ success: true, user: newUser[0] });
   } catch (error) {
-    console.error('Create user error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Create user error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -90,7 +92,8 @@ const updateUser = async (req, res) => {
       );
       
       if (targetUser.length > 0 && targetUser[0].role === 'admin') {
-        return res.status(403).json({ error: 'Cannot modify another admin user\'s role' });
+        console.log(`[ADMIN] Update rejected: User ${req.user.id} attempted to modify another admin`);
+        return res.status(403).json({ success: false, message: 'Cannot modify another admin user\'s role' });
       }
     }
     
@@ -119,7 +122,7 @@ const updateUser = async (req, res) => {
     }
     
     if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
+      return res.status(400).json({ success: false, message: 'No fields to update' });
     }
     
     params.push(id);
@@ -134,10 +137,11 @@ const updateUser = async (req, res) => {
       [id]
     );
     
+    console.log(`[ADMIN] User ${id} updated by ${req.user.id}`);
     res.json({ success: true, user: updatedUser[0] });
   } catch (error) {
-    console.error('Update user error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Update user error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -154,7 +158,8 @@ const toggleUserStatus = async (req, res) => {
       );
       
       if (targetUser.length > 0 && targetUser[0].role === 'admin') {
-        return res.status(403).json({ error: 'Cannot deactivate another admin user' });
+        console.log(`[ADMIN] Toggle status rejected: User ${req.user.id} attempted to deactivate another admin`);
+        return res.status(403).json({ success: false, message: 'Cannot deactivate another admin user' });
       }
     }
     
@@ -165,7 +170,7 @@ const toggleUserStatus = async (req, res) => {
     );
     
     if (currentUser.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
     
     // Toggle the status
@@ -183,6 +188,7 @@ const toggleUserStatus = async (req, res) => {
     const newStatus = updatedUser[0].is_active;
     const statusText = newStatus ? 'activated' : 'deactivated';
     
+    console.log(`[ADMIN] User ${id} ${statusText} by ${req.user.id}`);
     res.json({ 
       success: true, 
       message: `User ${statusText} successfully`,
@@ -190,8 +196,8 @@ const toggleUserStatus = async (req, res) => {
       is_active: newStatus
     });
   } catch (error) {
-    console.error('Toggle user status error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Toggle user status error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -231,8 +237,8 @@ const getAllLabs = async (req, res) => {
       total: labs.length
     });
   } catch (error) {
-    console.error('Get all labs error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Get all labs error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -260,9 +266,11 @@ const createLab = async (req, res) => {
       [result.insertId]
     );
     
+    console.log(`[ADMIN] Lab created: ${newLab[0].name} (ID: ${newLab[0].id})`);
     res.status(201).json({ success: true, lab: newLab[0] });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Create lab error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -292,9 +300,11 @@ const updateLab = async (req, res) => {
       [id]
     );
     
+    console.log(`[ADMIN] Lab ${id} updated by ${req.user.id}`);
     res.json({ success: true, lab: updatedLab[0] });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Update lab error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -313,7 +323,8 @@ const deleteLab = async (req, res) => {
     
     if (existingLab.length === 0) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Lab not found' });
+      console.log(`[ADMIN] Delete lab failed: Lab ${id} not found`);
+      return res.status(404).json({ success: false, message: 'Lab not found' });
     }
     
     // Check if there are any active or future bookings for this lab
@@ -327,8 +338,10 @@ const deleteLab = async (req, res) => {
     
     if (activeBookings[0].count > 0) {
       await connection.rollback();
+      console.log(`[ADMIN] Delete lab failed: Lab ${id} has active bookings`);
       return res.status(400).json({ 
-        error: 'Cannot delete lab with active or future bookings. Please cancel all bookings first.' 
+        success: false, 
+        message: 'Cannot delete lab with active or future bookings. Please cancel all bookings first.' 
       });
     }
     
@@ -345,12 +358,13 @@ const deleteLab = async (req, res) => {
     );
     
     await connection.commit();
+    console.log(`[ADMIN] Lab ${id} deleted by ${req.user.id}`);
     
     res.json({ success: true, message: 'Lab deleted successfully' });
   } catch (error) {
     await connection.rollback();
-    console.error('Delete lab error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Delete lab error:', error);
+    res.status(500).json({ success: false, message: error.message });
   } finally {
     connection.release();
   }
@@ -367,7 +381,7 @@ const toggleLabStatus = async (req, res) => {
     );
     
     if (currentLab.length === 0) {
-      return res.status(404).json({ error: 'Lab not found' });
+      return res.status(404).json({ success: false, message: 'Lab not found' });
     }
     
     // Toggle the status
@@ -398,6 +412,7 @@ const toggleLabStatus = async (req, res) => {
       message: `Lab ${statusText}`
     });
     
+    console.log(`[ADMIN] Lab ${id} ${statusText} by ${req.user.id}`);
     res.json({ 
       success: true, 
       message: `Lab ${statusText} successfully`,
@@ -405,8 +420,8 @@ const toggleLabStatus = async (req, res) => {
       is_active: newStatus
     });
   } catch (error) {
-    console.error('Toggle lab status error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Toggle lab status error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -439,264 +454,8 @@ const getDashboardStats = async (req, res) => {
       utilizationPercentage: utilization[0].utilization_percentage || 0
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const getRecentBookings = async (req, res) => {
-  try {
-    const { limit = 10 } = req.query;
-    
-    const [bookings] = await pool.execute(`
-      SELECT 
-        b.id,
-        b.lab_id,
-        b.user_id,
-        b.booking_date,
-        b.start_time,
-        b.end_time,
-        b.duration_hours,
-        b.status,
-        b.purpose,
-        u.name as user_name,
-        u.bc_number,
-        l.name as lab_name
-      FROM bookings b
-      JOIN users u ON b.user_id = u.id
-      JOIN labs l ON b.lab_id = l.id
-      ORDER BY b.created_at DESC
-      LIMIT ?
-    `, [parseInt(limit)]);
-    
-    res.json({ success: true, bookings });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const getBookingsPerDay = async (req, res) => {
-  try {
-    const { days = 7 } = req.query;
-    
-    const [bookings] = await pool.execute(`
-      SELECT 
-        DAYNAME(booking_date) as day,
-        COUNT(*) as bookings,
-        COUNT(DISTINCT lab_id) * 10.5 as capacity
-      FROM bookings 
-      WHERE booking_date >= CURDATE() - INTERVAL ? DAY
-      AND booking_date <= CURDATE()
-      AND status = 'confirmed'
-      GROUP BY DAYNAME(booking_date), booking_date
-      ORDER BY booking_date
-    `, [parseInt(days)]);
-    
-    // Format data for frontend
-    const formattedData = bookings.map(booking => ({
-      day: booking.day.substring(0, 3).toUpperCase(),
-      bookings: booking.bookings,
-      capacity: booking.capacity
-    }));
-    
-    res.json({ success: true, data: formattedData });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const getAllBookings = async (req, res) => {
-  try {
-    const { start_date, end_date, bc_number, status } = req.query;
-    let query = `
-      SELECT b.*, u.name as user_name, u.bc_number, l.name as lab_name, l.building 
-      FROM bookings b 
-      JOIN users u ON b.user_id = u.id 
-      JOIN labs l ON b.lab_id = l.id 
-      WHERE 1=1
-    `;
-    const params = [];
-
-    if (start_date && end_date) {
-      query += ' AND b.booking_date BETWEEN ? AND ?';
-      params.push(start_date, end_date);
-    }
-    if (bc_number) {
-      query += ' AND u.bc_number = ?';
-      params.push(bc_number);
-    }
-    if (status) {
-      query += ' AND b.status = ?';
-      params.push(status);
-    }
-
-    query += ' ORDER BY b.created_at DESC';
-
-    const [bookings] = await pool.execute(query, params);
-    res.json({ success: true, bookings });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const getAnalytics = async (req, res) => {
-  try {
-    const { start_date, end_date } = req.query;
-
-    // Calculate the number of days in the date range
-    const startDate = new Date(start_date || '2000-01-01');
-    const endDate = new Date(end_date || '2099-12-31');
-    const daysInRange = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-    const totalAvailableHoursPerLab = 8 * daysInRange; // 8 hours per day
-
-    // Enhanced analytics with confirmed and completed bookings
-    const [utilization] = await pool.execute(`
-      SELECT 
-        l.id,
-        l.name,
-        l.building,
-        COUNT(DISTINCT CASE WHEN b.status IN ('confirmed', 'completed') THEN b.id END) as total_bookings,
-        COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END) as confirmed_bookings,
-        COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN b.id END) as completed_bookings,
-        COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN b.duration_hours END), 0) as total_hours,
-        COUNT(DISTINCT CASE WHEN b.status IN ('confirmed', 'completed') THEN b.user_id END) as unique_users,
-        COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN l.hourly_charges * b.duration_hours END), 0) as revenue,
-        ROUND(
-          (COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN b.duration_hours END), 0) / ?) * 100, 
-          2
-        ) as utilization_percentage
-      FROM labs l
-      LEFT JOIN bookings b ON l.id = b.lab_id 
-        AND b.booking_date BETWEEN ? AND ?
-        AND b.status IN ('confirmed', 'completed')
-      GROUP BY l.id
-      ORDER BY total_bookings DESC
-    `, [totalAvailableHoursPerLab, start_date || '2000-01-01', end_date || '2099-12-31']);
-
-    // Get total number of labs for overall utilization calculation
-    const [totalLabs] = await pool.execute('SELECT COUNT(*) as count FROM labs');
-    const labCount = totalLabs[0].count;
-    const totalSystemHours = labCount * totalAvailableHoursPerLab;
-
-    // Enhanced summary with more metrics
-    const [summary] = await pool.execute(`
-      SELECT 
-        COUNT(DISTINCT CASE WHEN b.status IN ('confirmed', 'completed') THEN b.user_id END) as active_users,
-        COUNT(CASE WHEN b.status IN ('confirmed', 'completed') THEN 1 END) as total_bookings,
-        COUNT(CASE WHEN b.status = 'confirmed' THEN 1 END) as confirmed_bookings,
-        COUNT(CASE WHEN b.status = 'completed' THEN 1 END) as completed_bookings,
-        COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN b.duration_hours END), 0) as total_hours_booked,
-        COUNT(DISTINCT CASE WHEN b.status IN ('confirmed', 'completed') THEN b.lab_id END) as labs_used,
-        COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN l.hourly_charges * b.duration_hours END), 0) as total_revenue,
-        ROUND(
-          (COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN b.duration_hours END), 0) / ?) * 100, 
-          2
-        ) as overall_utilization
-      FROM bookings b
-      JOIN labs l ON b.lab_id = l.id
-      WHERE b.booking_date BETWEEN ? AND ?
-        AND b.status IN ('confirmed', 'completed')
-    `, [totalSystemHours, start_date || '2000-01-01', end_date || '2099-12-31']);
-
-    // Get time-wise trends for the selected period
-    const [dailyTrends] = await pool.execute(`
-      SELECT 
-        CASE 
-          WHEN EXTRACT(HOUR FROM b.start_time) BETWEEN 6 AND 11 THEN 'Morning (6AM-12PM)'
-          WHEN EXTRACT(HOUR FROM b.start_time) BETWEEN 12 AND 17 THEN 'Afternoon (12PM-6PM)'
-          WHEN EXTRACT(HOUR FROM b.start_time) BETWEEN 18 AND 22 THEN 'Evening (6PM-10PM)'
-          ELSE 'Night (10PM-6AM)'
-        END as time_slot,
-        COUNT(CASE WHEN b.status IN ('confirmed', 'completed') THEN 1 END) as bookings,
-        COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN b.duration_hours END), 0) as hours,
-        COUNT(DISTINCT CASE WHEN b.status IN ('confirmed', 'completed') THEN b.user_id END) as unique_users
-      FROM bookings b
-      WHERE b.booking_date BETWEEN ? AND ?
-        AND b.status IN ('confirmed', 'completed')
-      GROUP BY time_slot
-      ORDER BY 
-        CASE 
-          WHEN time_slot = 'Morning (6AM-12PM)' THEN 1
-          WHEN time_slot = 'Afternoon (12PM-6PM)' THEN 2
-          WHEN time_slot = 'Evening (6PM-10PM)' THEN 3
-          ELSE 4
-        END
-    `, [start_date || '2000-01-01', end_date || '2099-12-31']);
-
-    // Get monthly comparison for growth calculation
-    const [monthlyData] = await pool.execute(`
-      SELECT 
-        DATE_FORMAT(b.booking_date, '%Y-%m') as month,
-        COUNT(CASE WHEN b.status IN ('confirmed', 'completed') THEN 1 END) as bookings,
-        COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN b.duration_hours END), 0) as hours
-      FROM bookings b
-      WHERE b.booking_date BETWEEN DATE_SUB(?, INTERVAL 2 MONTH) AND ?
-        AND b.status IN ('confirmed', 'completed')
-      GROUP BY DATE_FORMAT(b.booking_date, '%Y-%m')
-      ORDER BY month ASC
-    `, [start_date || '2000-01-01', end_date || '2099-12-31']);
-
-    // Get lab ranking with growth
-    const [labRanking] = await pool.execute(`
-      SELECT 
-        l.id,
-        l.name,
-        l.building,
-        COUNT(CASE WHEN b.status IN ('confirmed', 'completed') AND DATE_FORMAT(b.booking_date, '%Y-%m') = DATE_FORMAT(?, '%Y-%m') THEN 1 END) as current_month_bookings,
-        COUNT(CASE WHEN b.status IN ('confirmed', 'completed') AND DATE_FORMAT(b.booking_date, '%Y-%m') = DATE_FORMAT(DATE_SUB(?, INTERVAL 1 MONTH), '%Y-%m') THEN 1 END) as previous_month_bookings,
-        COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') AND DATE_FORMAT(b.booking_date, '%Y-%m') = DATE_FORMAT(?, '%Y-%m') THEN b.duration_hours END), 0) as current_month_hours,
-        COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') AND DATE_FORMAT(b.booking_date, '%Y-%m') = DATE_FORMAT(DATE_SUB(?, INTERVAL 1 MONTH), '%Y-%m') THEN b.duration_hours END), 0) as previous_month_hours
-      FROM labs l
-      LEFT JOIN bookings b ON l.id = b.lab_id 
-        AND b.booking_date >= DATE_SUB(?, INTERVAL 2 MONTH)
-        AND b.booking_date <= ?
-        AND b.status IN ('confirmed', 'completed')
-      GROUP BY l.id
-      HAVING current_month_hours > 0 OR previous_month_hours > 0
-      ORDER BY current_month_hours DESC
-    `, [end_date, end_date, end_date, end_date, start_date || '2000-01-01', end_date || '2099-12-31']);
-
-    // Calculate growth percentages
-    const rankingWithGrowth = labRanking.map(lab => ({
-      ...lab,
-      utilization_percentage: totalAvailableHoursPerLab > 0 ? ((lab.current_month_hours / totalAvailableHoursPerLab) * 100).toFixed(2) : 0,
-      growth_percentage: lab.previous_month_hours > 0 ? 
-        (((lab.current_month_hours - lab.previous_month_hours) / lab.previous_month_hours) * 100).toFixed(1) : 
-        (lab.current_month_hours > 0 ? '100.0' : '0.0')
-    }));
-
-    // Get peak hour analysis
-    const [peakHours] = await pool.execute(`
-      SELECT 
-        EXTRACT(HOUR FROM b.start_time) as hour,
-        COUNT(CASE WHEN b.status IN ('confirmed', 'completed') THEN 1 END) as bookings,
-        COUNT(DISTINCT b.lab_id) as labs_used,
-        COUNT(DISTINCT CASE WHEN b.status IN ('confirmed', 'completed') THEN b.user_id END) as active_users
-      FROM bookings b
-      WHERE b.booking_date BETWEEN ? AND ?
-        AND b.status IN ('confirmed', 'completed')
-      GROUP BY EXTRACT(HOUR FROM b.start_time)
-      ORDER BY bookings DESC
-    `, [start_date || '2000-01-01', end_date || '2099-12-31']);
-
-    res.json({
-      success: true,
-      utilization,
-      summary: summary[0] || {},
-      dailyTrends,
-      monthlyData,
-      labRanking: rankingWithGrowth.slice(0, 5), // Top 5 labs
-      peakHours,
-      metadata: {
-        totalLabs: labCount,
-        daysInRange,
-        totalAvailableHoursPerLab,
-        totalSystemHours
-      }
-    });
-
-  } catch (error) {
-    console.error('Analytics error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Dashboard stats error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -708,7 +467,7 @@ const updateBookingStatus = async (req, res) => {
     // Validate status
     const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
+      return res.status(400).json({ success: false, message: 'Invalid status' });
     }
     
     // Update booking status
@@ -728,9 +487,10 @@ const updateBookingStatus = async (req, res) => {
     );
     
     if (updatedBooking.length === 0) {
-      return res.status(404).json({ error: 'Booking not found' });
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
     
+    console.log(`[ADMIN] Booking ${id} status changed to ${status} by ${req.user.id}`);
     res.json({
       success: true,
       booking: updatedBooking[0],
@@ -738,7 +498,8 @@ const updateBookingStatus = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Update booking status error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -784,8 +545,8 @@ const autoCompleteExpiredBookings = async (req, res) => {
       completedBookings: expiredBookings
     });
   } catch (error) {
-    console.error('Auto-complete expired bookings error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Auto-complete error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -822,8 +583,8 @@ const getPendingBookings = async (req, res) => {
       total: bookings.length
     });
   } catch (error) {
-    console.error('Get pending bookings error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Pending bookings error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -839,7 +600,7 @@ const approveBooking = async (req, res) => {
     );
     
     if (existingBooking.length === 0) {
-      return res.status(404).json({ error: 'Pending booking not found' });
+      return res.status(404).json({ success: false, message: 'Pending booking not found' });
     }
     
     // Update booking status
@@ -863,14 +624,194 @@ const approveBooking = async (req, res) => {
     `, [id]);
     
     const actionText = approved ? 'approved' : 'rejected';
+    console.log(`[ADMIN] Booking ${id} ${actionText} by ${req.user.id}`);
     res.json({ 
       success: true, 
       message: `Booking ${actionText} successfully`,
       booking: updatedBooking[0]
     });
   } catch (error) {
-    console.error('Approve booking error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[ADMIN] Approve booking error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getAllBookings = async (req, res) => {
+  try {
+    const { status, start_date, end_date, lab_id, user_id } = req.query;
+    
+    let query = `
+      SELECT 
+        b.*,
+        u.name as user_name,
+        u.bc_number as user_bc_number,
+        l.name as lab_name,
+        l.building
+      FROM bookings b
+      JOIN users u ON b.user_id = u.id
+      JOIN labs l ON b.lab_id = l.id
+      WHERE 1=1
+    `;
+    const params = [];
+    
+    if (status) {
+      query += ' AND b.status = ?';
+      params.push(status);
+    }
+    
+    if (start_date) {
+      query += ' AND b.booking_date >= ?';
+      params.push(start_date);
+    }
+    
+    if (end_date) {
+      query += ' AND b.booking_date <= ?';
+      params.push(end_date);
+    }
+    
+    if (lab_id) {
+      query += ' AND b.lab_id = ?';
+      params.push(lab_id);
+    }
+    
+    if (user_id) {
+      query += ' AND b.user_id = ?';
+      params.push(user_id);
+    }
+    
+    query += ' ORDER BY b.booking_date DESC, b.start_time DESC LIMIT 200';
+    
+    const [bookings] = await pool.execute(query, params);
+    
+    res.json({ 
+      success: true, 
+      bookings: bookings,
+      total: bookings.length
+    });
+  } catch (error) {
+    console.error('[ADMIN] Get all bookings error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getAnalytics = async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    
+    // Booking status distribution
+    const [statusCounts] = await pool.execute(`
+      SELECT status, COUNT(*) as count 
+      FROM bookings 
+      WHERE booking_date >= CURDATE() - INTERVAL ? DAY
+      GROUP BY status
+    `, [parseInt(days)]);
+    
+    // Bookings by building
+    const [buildingStats] = await pool.execute(`
+      SELECT 
+        l.building,
+        COUNT(*) as total_bookings,
+        SUM(CASE WHEN b.status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_bookings
+      FROM bookings b
+      JOIN labs l ON b.lab_id = l.id
+      WHERE b.booking_date >= CURDATE() - INTERVAL ? DAY
+      GROUP BY l.building
+    `, [parseInt(days)]);
+    
+    // Peak hours
+    const [peakHours] = await pool.execute(`
+      SELECT 
+        HOUR(start_time) as hour,
+        COUNT(*) as booking_count
+      FROM bookings
+      WHERE booking_date >= CURDATE() - INTERVAL ? DAY
+      AND status = 'confirmed'
+      GROUP BY HOUR(start_time)
+      ORDER BY booking_count DESC
+      LIMIT 5
+    `, [parseInt(days)]);
+    
+    // User activity
+    const [topUsers] = await pool.execute(`
+      SELECT 
+        u.name,
+        u.bc_number,
+        COUNT(*) as booking_count
+      FROM bookings b
+      JOIN users u ON b.user_id = u.id
+      WHERE b.booking_date >= CURDATE() - INTERVAL ? DAY
+      GROUP BY b.user_id
+      ORDER BY booking_count DESC
+      LIMIT 10
+    `, [parseInt(days)]);
+    
+    res.json({
+      success: true,
+      statusDistribution: statusCounts,
+      buildingStats: buildingStats,
+      peakHours: peakHours,
+      topUsers: topUsers,
+      periodDays: parseInt(days)
+    });
+  } catch (error) {
+    console.error('[ADMIN] Analytics error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getRecentBookings = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    const [bookings] = await pool.execute(`
+      SELECT 
+        b.*,
+        u.name as user_name,
+        l.name as lab_name,
+        l.building
+      FROM bookings b
+      JOIN users u ON b.user_id = u.id
+      JOIN labs l ON b.lab_id = l.id
+      ORDER BY b.created_at DESC
+      LIMIT ${limit}
+    `);
+    
+    res.json({
+      success: true,
+      bookings: bookings,
+      total: bookings.length
+    });
+  } catch (error) {
+    console.error('[ADMIN] Recent bookings error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getBookingsPerDay = async (req, res) => {
+  try {
+    const { days = 14 } = req.query;
+    
+    const [dailyStats] = await pool.execute(`
+      SELECT 
+        booking_date,
+        COUNT(*) as total_bookings,
+        SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as confirmed,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+      FROM bookings
+      WHERE booking_date >= CURDATE() - INTERVAL ? DAY
+      GROUP BY booking_date
+      ORDER BY booking_date ASC
+    `, [parseInt(days)]);
+    
+    res.json({
+      success: true,
+      dailyStats: dailyStats,
+      periodDays: parseInt(days)
+    });
+  } catch (error) {
+    console.error('[ADMIN] Bookings per day error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

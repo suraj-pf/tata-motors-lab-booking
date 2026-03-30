@@ -22,23 +22,27 @@ const createBooking = async (req, res) => {
     
     if (startMinutes < MIN_START_TIME) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Booking cannot start before 06:30 AM.' });
+      console.log(`[BOOKING REJECTED] User ${req.user.id} attempted to book before 06:30 AM: ${start_time}`);
+      return res.status(400).json({ success: false, message: 'Booking cannot start before 06:30 AM.' });
     }
     
     if (endMinutes > MAX_END_TIME) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Booking cannot end after 05:30 PM.' });
+      console.log(`[BOOKING REJECTED] User ${req.user.id} attempted to book after 17:30 PM: ${end_time}`);
+      return res.status(400).json({ success: false, message: 'Booking cannot end after 05:30 PM.' });
     }
 
     // Rule 2: Duration validation
     if (duration > 10.5) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Maximum 10.5 hours allowed' });
+      console.log(`[BOOKING REJECTED] User ${req.user.id} attempted booking duration > 10.5h: ${duration}h`);
+      return res.status(400).json({ success: false, message: 'Maximum 10.5 hours allowed' });
     }
 
     if (duration < 0.5) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Minimum 0.5 hours required' });
+      console.log(`[BOOKING REJECTED] User ${req.user.id} attempted booking duration < 0.5h: ${duration}h`);
+      return res.status(400).json({ success: false, message: 'Minimum 0.5 hours required' });
     }
 
     // Rule 3: No past booking validation (with current hour flexibility)
@@ -54,7 +58,8 @@ const createBooking = async (req, res) => {
     // Check if booking date is in the past
     if (bookingDateOnly < currentDate) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Cannot book past dates. Please select today or a future date.' });
+      console.log(`[BOOKING REJECTED] User ${req.user.id} attempted to book past date: ${booking_date}`);
+      return res.status(400).json({ success: false, message: 'Cannot book past dates. Please select today or a future date.' });
     }
     
     // If booking is for today, check current hour flexibility
@@ -66,13 +71,15 @@ const createBooking = async (req, res) => {
       // Allow booking if it's the current hour (within first 30 mins) or future
       if (startMinutes < currentHourMinutes) {
         await connection.rollback();
-        return res.status(400).json({ error: 'Booking must be for current hour or future time.' });
+        console.log(`[BOOKING REJECTED] User ${req.user.id} attempted to book past time: ${start_time} (current: ${currentHour}:${currentMin})`);
+        return res.status(400).json({ success: false, message: 'Booking must be for current hour or future time.' });
       }
       
       // If it's the current hour, only allow if within first 30 minutes
       if (startMinutes === currentHourMinutes && currentMin >= 30) {
         await connection.rollback();
-        return res.status(400).json({ error: 'Cannot book current hour after 30 minutes have passed.' });
+        console.log(`[BOOKING REJECTED] User ${req.user.id} attempted to book current hour after 30min mark`);
+        return res.status(400).json({ success: false, message: 'Cannot book current hour after 30 minutes have passed.' });
       }
     }
 
@@ -91,6 +98,7 @@ const createBooking = async (req, res) => {
     if (conflicts.length > 0) {
       await connection.rollback();
       const conflict = conflicts[0];
+      console.log(`[BOOKING CONFLICT] User ${req.user.id} attempted to book lab ${lab_id} at ${start_time}-${end_time} but conflict exists: booking ${conflict.id}`);
       return res.status(409).json({ 
         success: false,
         conflict: true,
@@ -113,7 +121,8 @@ const createBooking = async (req, res) => {
 
     if (lab.length === 0) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Lab not found or unavailable' });
+      console.log(`[BOOKING REJECTED] User ${req.user.id} attempted to book invalid lab: ${lab_id}`);
+      return res.status(404).json({ success: false, message: 'Lab not found or unavailable' });
     }
 
     // Rule 5: Validate BC number if provided
@@ -125,7 +134,8 @@ const createBooking = async (req, res) => {
       
       if (bcCheck.length === 0) {
         await connection.rollback();
-        return res.status(400).json({ error: 'Invalid BC number' });
+        console.log(`[BOOKING REJECTED] User ${req.user.id} provided invalid BC number: ${bc_number}`);
+        return res.status(400).json({ success: false, message: 'Invalid BC number' });
       }
     }
 
@@ -139,6 +149,7 @@ const createBooking = async (req, res) => {
     );
 
     const bookingId = result.insertId;
+    console.log(`[BOOKING CREATED] ID: ${bookingId}, User: ${req.user.id}, Lab: ${lab_id}, Time: ${start_time}-${end_time}, Date: ${booking_date}`);
 
     await connection.commit();
 
@@ -259,317 +270,13 @@ const createBooking = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    console.error('Create booking error:', error);
-    res.status(500).json({ error: 'Failed to create booking: ' + error.message });
+    console.error(`[BOOKING ERROR] User ${req.user?.id}:`, error);
+    res.status(500).json({ success: false, message: 'Failed to create booking', error: error.message });
   } finally {
     connection.release();
   }
 };
 
-const updateBooking = async (req, res) => {
-  const connection = await pool.getConnection();
-  
-  try {
-    await connection.beginTransaction();
-    
-    const { id } = req.params;
-    const { booking_date, start_time, end_time, purpose } = req.body;
-    const userId = req.user.id;
-    
-    // Validate input
-    if (!booking_date || !start_time || !end_time) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'Booking date, start time, and end time are required' });
-    }
-    
-    // Get existing booking
-    const [existingBooking] = await connection.execute(
-      'SELECT * FROM bookings WHERE id = ? AND user_id = ?',
-      [id, userId]
-    );
-    
-    if (existingBooking.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ error: 'Booking not found' });
-    }
-    
-    const booking = existingBooking[0];
-    
-    // Check if booking can be edited (only upcoming bookings)
-    const bookingEndTime = new Date(`${booking.booking_date}T${booking.end_time}`);
-    if (bookingEndTime < new Date()) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'Cannot edit past bookings' });
-    }
-    
-    // Validate time constraints
-    const [startHour, startMin] = start_time.split(':').map(Number);
-    const [endHour, endMin] = end_time.split(':').map(Number);
-    const startMinutes = startHour * 60 + startMin;
-    const endMinutes = endHour * 60 + endMin;
-    
-    const MIN_START_TIME = 6 * 60 + 30; // 06:30 AM
-    const MAX_END_TIME = 17 * 60 + 30; // 05:30 PM
-    
-    if (startMinutes < MIN_START_TIME || endMinutes > MAX_END_TIME) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'Booking time must be between 06:30 AM and 05:30 PM' });
-    }
-    
-    // Check for conflicts (exclude current booking)
-    const [conflicts] = await connection.execute(
-      `SELECT id, start_time, end_time, user_id, purpose
-       FROM bookings 
-       WHERE lab_id = ? 
-         AND booking_date = ? 
-         AND status = 'confirmed'
-         AND start_time < ? 
-         AND end_time > ?
-         AND id != ?`,
-      [booking.lab_id, booking_date, end_time, start_time, id]
-    );
-    
-    if (conflicts.length > 0) {
-      await connection.rollback();
-      const conflict = conflicts[0];
-      return res.status(409).json({ 
-        success: false,
-        conflict: true,
-        message: `This lab is already booked from ${conflict.start_time} to ${conflict.end_time}`,
-        conflictDetails: {
-          start_time: conflict.start_time,
-          end_time: conflict.end_time,
-          booking_id: conflict.id,
-          purpose: conflict.purpose
-        },
-        suggestedAction: 'Please choose a different time slot'
-      });
-    }
-    
-    // Calculate duration
-    const duration = (endMinutes - startMinutes) / 60;
-    
-    // Update booking
-    await connection.execute(
-      `UPDATE bookings SET 
-        booking_date = ?,
-        start_time = ?,
-        end_time = ?,
-        duration_hours = ?,
-        purpose = ?,
-        updated_at = NOW()
-       WHERE id = ? AND user_id = ?`,
-      [booking_date, start_time, end_time, duration, purpose || booking.purpose, id, userId]
-    );
-    
-    await connection.commit();
-    
-    // Fetch updated booking details
-    const [updatedBooking] = await connection.execute(
-      `SELECT 
-        b.*, 
-        l.name as lab_name, 
-        l.building,
-        l.capacity,
-        l.is_ac,
-        l.facilities,
-        u.name as user_name,
-        u.department
-       FROM bookings b
-       JOIN labs l ON b.lab_id = l.id
-       JOIN users u ON b.user_id = u.id
-       WHERE b.id = ?`,
-      [id]
-    );
-    
-    const bookingData = updatedBooking[0];
-    
-    // Log to audit
-    await AuditLog.logAction(
-      req.user.id, 
-      'booking_updated', 
-      booking.lab_id, 
-      id, 
-      null, 
-      bookingData,
-      req.ip,
-      req.get('user-agent')
-    );
-    
-    // Emit real-time updates
-    const io = require('../shared/config/socket').getIO();
-    
-    if (io) {
-      io.to(`lab-${booking.lab_id}`).emit('booking-updated', {
-        type: 'booking-updated',
-        lab_id: booking.lab_id,
-        booking: bookingData,
-        timestamp: new Date().toISOString()
-      });
-      
-      io.to('admin-room').emit('booking-updated', {
-        type: 'booking-updated',
-        lab_id: booking.lab_id,
-        booking: bookingData,
-        timestamp: new Date().toISOString()
-      });
-      
-      io.emit('timeline-update', {
-        type: 'booking-updated',
-        lab_id: booking.lab_id,
-        booking: bookingData,
-        booking_date: booking_date,
-        timestamp: new Date().toISOString()
-      });
-      
-      io.to(`user-${userId}`).emit('user-notification', {
-        type: 'booking-updated',
-        message: 'Your booking has been updated',
-        data: bookingData
-      });
-    }
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Booking updated successfully',
-      booking: bookingData 
-    });
-    
-  } catch (error) {
-    await connection.rollback();
-    console.error('Update booking error:', error);
-    res.status(500).json({ error: 'Failed to update booking: ' + error.message });
-  } finally {
-    connection.release();
-  }
-};
-
-const cancelBooking = async (req, res) => {
-  const connection = await pool.getConnection();
-  
-  try {
-    await connection.beginTransaction();
-    
-    const { id } = req.params;
-    const userId = req.user.id;
-    
-    // Get existing booking
-    const [existingBooking] = await connection.execute(
-      'SELECT * FROM bookings WHERE id = ? AND user_id = ?',
-      [id, userId]
-    );
-    
-    if (existingBooking.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ error: 'Booking not found' });
-    }
-    
-    const booking = existingBooking[0];
-    
-    // Check if booking is already cancelled
-    if (booking.status === 'cancelled') {
-      await connection.rollback();
-      return res.status(400).json({ error: 'Booking is already cancelled' });
-    }
-    
-    // Update booking status to cancelled
-    await connection.execute(
-      `UPDATE bookings SET 
-        status = 'cancelled',
-        cancelled_at = NOW(),
-        updated_at = NOW()
-       WHERE id = ? AND user_id = ?`,
-      [id, userId]
-    );
-    
-    await connection.commit();
-    
-    // Fetch updated booking details
-    const [updatedBooking] = await connection.execute(
-      `SELECT 
-        b.*, 
-        l.name as lab_name, 
-        l.building,
-        l.capacity,
-        l.is_ac,
-        l.facilities,
-        u.name as user_name,
-        u.department
-       FROM bookings b
-       JOIN labs l ON b.lab_id = l.id
-       JOIN users u ON b.user_id = u.id
-       WHERE b.id = ?`,
-      [id]
-    );
-    
-    const bookingData = updatedBooking[0];
-    
-    // Log to audit
-    await AuditLog.logAction(
-      req.user.id, 
-      'booking_cancelled', 
-      booking.lab_id, 
-      id, 
-      null, 
-      bookingData,
-      req.ip,
-      req.get('user-agent')
-    );
-    
-    // Emit real-time updates
-    const io = require('../shared/config/socket').getIO();
-    
-    if (io) {
-      io.to(`lab-${booking.lab_id}`).emit('booking-cancelled', {
-        type: 'booking-cancelled',
-        lab_id: booking.lab_id,
-        booking: bookingData,
-        timestamp: new Date().toISOString()
-      });
-      
-      io.to('admin-room').emit('booking-cancelled', {
-        type: 'booking-cancelled',
-        lab_id: booking.lab_id,
-        booking: bookingData,
-        timestamp: new Date().toISOString()
-      });
-      
-      io.emit('timeline-update', {
-        type: 'booking-cancelled',
-        lab_id: booking.lab_id,
-        booking: bookingData,
-        booking_date: booking.booking_date,
-        timestamp: new Date().toISOString()
-      });
-      
-      io.emit('room-status-update', {
-        lab_id: booking.lab_id,
-        status: 'available',
-        timestamp: new Date().toISOString(),
-        current_booking: null
-      });
-      
-      io.to(`user-${userId}`).emit('user-notification', {
-        type: 'booking-cancelled',
-        message: 'Your booking has been cancelled',
-        data: bookingData
-      });
-    }
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Booking cancelled successfully',
-      booking: bookingData 
-    });
-    
-  } catch (error) {
-    await connection.rollback();
-    console.error('Cancel booking error:', error);
-    res.status(500).json({ error: 'Failed to cancel booking: ' + error.message });
-  } finally {
-    connection.release();
-  }
-};
 
 const getUserBookings = async (req, res) => {
   try {
@@ -577,7 +284,7 @@ const getUserBookings = async (req, res) => {
     const { start_date, end_date, booking_date } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
     }
 
     let query = `
@@ -655,10 +362,11 @@ const getUserBookings = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching user bookings:', error);
+    console.error('[BOOKING FETCH ERROR]:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch bookings',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      success: false,
+      message: 'Failed to fetch bookings',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -686,7 +394,7 @@ const getBookingById = async (req, res) => {
     );
 
     if (bookings.length === 0) {
-      return res.status(404).json({ error: 'Booking not found' });
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
     res.json({ 
@@ -695,8 +403,8 @@ const getBookingById = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get booking by id error:', error);
-    res.status(500).json({ error: 'Failed to fetch booking: ' + error.message });
+    console.error('[BOOKING FETCH ERROR]:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch booking', error: error.message });
   }
 };
 
@@ -717,37 +425,43 @@ const cancelBooking = async (req, res) => {
 
     if (booking.length === 0) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Booking not found' });
+      console.log(`[CANCEL REJECTED] Booking ${bookingId} not found`);
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
     // Check if user owns the booking or is admin
     if (booking[0].user_id !== req.user.id && req.user.role !== 'admin') {
       await connection.rollback();
-      return res.status(403).json({ error: 'Not authorized to cancel this booking' });
+      console.log(`[CANCEL REJECTED] User ${req.user.id} not authorized to cancel booking ${bookingId}`);
+      return res.status(403).json({ success: false, message: 'Not authorized to cancel this booking' });
     }
 
     // Validate cancellation rules
     if (booking[0].booking_date < today) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Cannot cancel past bookings' });
+      console.log(`[CANCEL REJECTED] Attempted to cancel past booking ${bookingId}`);
+      return res.status(400).json({ success: false, message: 'Cannot cancel past bookings' });
     }
 
     if (booking[0].booking_date === today) {
       const currentTime = new Date().toTimeString().slice(0, 5);
       if (booking[0].start_time <= currentTime) {
         await connection.rollback();
-        return res.status(400).json({ error: 'Cannot cancel booking that has already started' });
+        console.log(`[CANCEL REJECTED] Attempted to cancel already-started booking ${bookingId}`);
+        return res.status(400).json({ success: false, message: 'Cannot cancel booking that has already started' });
       }
     }
 
     if (booking[0].status === 'cancelled') {
       await connection.rollback();
-      return res.status(400).json({ error: 'Booking already cancelled' });
+      console.log(`[CANCEL REJECTED] Booking ${bookingId} already cancelled`);
+      return res.status(400).json({ success: false, message: 'Booking already cancelled' });
     }
 
     if (booking[0].status === 'completed') {
       await connection.rollback();
-      return res.status(400).json({ error: 'Cannot cancel completed booking' });
+      console.log(`[CANCEL REJECTED] Attempted to cancel completed booking ${bookingId}`);
+      return res.status(400).json({ success: false, message: 'Cannot cancel completed booking' });
     }
 
     // Update booking status
@@ -755,6 +469,7 @@ const cancelBooking = async (req, res) => {
       'UPDATE bookings SET status = "cancelled" WHERE id = ?',
       [bookingId]
     );
+    console.log(`[BOOKING CANCELLED] ID: ${bookingId}, User: ${req.user.id}, Reason: ${reason || 'No reason'}`);
 
     await connection.commit();
 
@@ -821,8 +536,8 @@ const cancelBooking = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    console.error('Cancel booking error:', error);
-    res.status(500).json({ error: 'Failed to cancel booking: ' + error.message });
+    console.error('[CANCEL ERROR]:', error);
+    res.status(500).json({ success: false, message: 'Failed to cancel booking', error: error.message });
   } finally {
     connection.release();
   }
@@ -833,7 +548,7 @@ const checkAvailability = async (req, res) => {
     const { lab_id, date, start_time, end_time } = req.query;
 
     if (!lab_id || !date) {
-      return res.status(400).json({ error: 'lab_id and date are required' });
+      return res.status(400).json({ success: false, message: 'lab_id and date are required' });
     }
 
     // If specific time range provided, check that slot
@@ -885,8 +600,8 @@ const checkAvailability = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Check availability error:', error);
-    res.status(500).json({ error: 'Failed to check availability: ' + error.message });
+    console.error('[AVAILABILITY ERROR]:', error);
+    res.status(500).json({ success: false, message: 'Failed to check availability', error: error.message });
   }
 };
 
@@ -922,8 +637,8 @@ const getUpcomingBookings = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get upcoming bookings error:', error);
-    res.status(500).json({ error: 'Failed to fetch upcoming bookings: ' + error.message });
+    console.error('[UPCOMING BOOKINGS ERROR]:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch upcoming bookings', error: error.message });
   }
 };
 
@@ -986,8 +701,8 @@ const getBookingHistory = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get booking history error:', error);
-    res.status(500).json({ error: 'Failed to fetch booking history: ' + error.message });
+    console.error('[BOOKING HISTORY ERROR]:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch booking history', error: error.message });
   }
 };
 
@@ -1007,25 +722,29 @@ const updateBooking = async (req, res) => {
 
     if (booking.length === 0) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Booking not found' });
+      console.log(`[UPDATE REJECTED] Booking ${bookingId} not found`);
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
     // Check ownership
     if (booking[0].user_id !== req.user.id && req.user.role !== 'admin') {
       await connection.rollback();
-      return res.status(403).json({ error: 'Not authorized to update this booking' });
+      console.log(`[UPDATE REJECTED] User ${req.user.id} not authorized to update booking ${bookingId}`);
+      return res.status(403).json({ success: false, message: 'Not authorized to update this booking' });
     }
 
     // Validate if update is allowed
     const today = new Date().toISOString().split('T')[0];
     if (booking[0].booking_date < today) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Cannot update past bookings' });
+      console.log(`[UPDATE REJECTED] Attempted to update past booking ${bookingId}`);
+      return res.status(400).json({ success: false, message: 'Cannot update past bookings' });
     }
 
     if (booking[0].status !== 'confirmed') {
       await connection.rollback();
-      return res.status(400).json({ error: 'Can only update confirmed bookings' });
+      console.log(`[UPDATE REJECTED] Attempted to update non-confirmed booking ${bookingId}`);
+      return res.status(400).json({ success: false, message: 'Can only update confirmed bookings' });
     }
 
     // Calculate new duration if times changed
@@ -1035,12 +754,14 @@ const updateBooking = async (req, res) => {
       
       if (duration > 10.5) {
         await connection.rollback();
-        return res.status(400).json({ error: 'Maximum 10.5 hours allowed' });
+        console.log(`[UPDATE REJECTED] Duration > 10.5h for booking ${bookingId}`);
+        return res.status(400).json({ success: false, message: 'Maximum 10.5 hours allowed' });
       }
 
       if (duration < 0.5) {
         await connection.rollback();
-        return res.status(400).json({ error: 'Minimum 0.5 hours required' });
+        console.log(`[UPDATE REJECTED] Duration < 0.5h for booking ${bookingId}`);
+        return res.status(400).json({ success: false, message: 'Minimum 0.5 hours required' });
       }
     }
 
@@ -1069,7 +790,8 @@ const updateBooking = async (req, res) => {
 
       if (conflicts.length > 0) {
         await connection.rollback();
-        return res.status(400).json({ error: 'Time slot conflict with existing booking' });
+        console.log(`[UPDATE CONFLICT] Booking ${bookingId} conflicts with existing booking`);
+        return res.status(400).json({ success: false, message: 'Time slot conflict with existing booking' });
       }
     }
 
@@ -1100,7 +822,8 @@ const updateBooking = async (req, res) => {
 
     if (updates.length === 0) {
       await connection.rollback();
-      return res.status(400).json({ error: 'No updates provided' });
+      console.log(`[UPDATE REJECTED] No updates provided for booking ${bookingId}`);
+      return res.status(400).json({ success: false, message: 'No updates provided' });
     }
 
     params.push(bookingId);
@@ -1137,6 +860,8 @@ const updateBooking = async (req, res) => {
     emitToLab(booking[0].lab_id, 'booking-updated', updatedBooking[0]);
     emitToUser(booking[0].user_id, 'booking-updated', updatedBooking[0]);
 
+    console.log(`[BOOKING UPDATED] ID: ${bookingId}, User: ${req.user.id}`);
+
     res.json({ 
       success: true, 
       message: 'Booking updated successfully',
@@ -1145,8 +870,8 @@ const updateBooking = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    console.error('Update booking error:', error);
-    res.status(500).json({ error: 'Failed to update booking: ' + error.message });
+    console.error('[UPDATE ERROR]:', error);
+    res.status(500).json({ success: false, message: 'Failed to update booking', error: error.message });
   } finally {
     connection.release();
   }
@@ -1192,10 +917,11 @@ const getTodayBookings = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching today bookings:', error);
+    console.error('[TODAY BOOKINGS ERROR]:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch today bookings',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      success: false,
+      message: 'Failed to fetch today bookings',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1211,7 +937,8 @@ const approveBooking = async (req, res) => {
     // Only admins can approve bookings
     if (req.user.role !== 'admin') {
       await connection.rollback();
-      return res.status(403).json({ error: 'Admin access required' });
+      console.log(`[APPROVE REJECTED] User ${req.user.id} not admin`);
+      return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 
     // Fetch booking with lock
@@ -1222,14 +949,16 @@ const approveBooking = async (req, res) => {
 
     if (booking.length === 0) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Booking not found' });
+      console.log(`[APPROVE REJECTED] Booking ${bookingId} not found`);
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
     const bookingData = booking[0];
 
     if (bookingData.status !== 'pending') {
       await connection.rollback();
-      return res.status(400).json({ error: 'Booking is not pending' });
+      console.log(`[APPROVE REJECTED] Booking ${bookingId} not pending`);
+      return res.status(400).json({ success: false, message: 'Booking is not pending' });
     }
 
     let newStatus = approved ? 'confirmed' : 'rejected';
@@ -1249,7 +978,8 @@ const approveBooking = async (req, res) => {
 
       if (conflicts.length > 0) {
         await connection.rollback();
-        return res.status(400).json({ error: 'Time slot now has conflicts. Cannot approve.' });
+        console.log(`[APPROVE CONFLICT] Booking ${bookingId} has conflicts`);
+        return res.status(400).json({ success: false, message: 'Time slot now has conflicts. Cannot approve.' });
       }
     }
 
@@ -1293,6 +1023,8 @@ const approveBooking = async (req, res) => {
       emitToUser(bookingData.user_id, 'booking-rejected', responseBooking);
     }
 
+    console.log(`[BOOKING ${approved ? 'APPROVED' : 'REJECTED'}] ID: ${bookingId}, Admin: ${req.user.id}`);
+
     res.json({
       success: true,
       message: `Booking ${approved ? 'approved' : 'rejected'} successfully`,
@@ -1301,8 +1033,8 @@ const approveBooking = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    console.error('Approve booking error:', error);
-    res.status(500).json({ error: 'Failed to process approval: ' + error.message });
+    console.error('[APPROVE ERROR]:', error);
+    res.status(500).json({ success: false, message: 'Failed to process approval', error: error.message });
   } finally {
     connection.release();
   }
@@ -1312,7 +1044,7 @@ const getPendingBookings = async (req, res) => {
   try {
     // Only admins can view pending bookings
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
+      return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 
     const [bookings] = await pool.execute(
@@ -1345,8 +1077,8 @@ const getPendingBookings = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get pending bookings error:', error);
-    res.status(500).json({ error: 'Failed to fetch pending bookings: ' + error.message });
+    console.error('[PENDING BOOKINGS ERROR]:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch pending bookings', error: error.message });
   }
 };
 

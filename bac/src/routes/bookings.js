@@ -1,5 +1,4 @@
 const express = require('express');
-const { createBooking } = require('../staff/controllers/bookingController');
 const { 
   getUserBookings, 
   getBookingById,
@@ -8,7 +7,8 @@ const {
   checkAvailability,
   getUpcomingBookings,
   getBookingHistory,
-  getTodayBookings
+  getTodayBookings,
+  createBooking
 } = require('../staff/controllers/bookingController');
 const { authMiddleware } = require('../shared/middleware/auth');
 const router = express.Router();

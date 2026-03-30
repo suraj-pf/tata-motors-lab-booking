@@ -7,7 +7,7 @@ class TimelineController {
       const { date } = req.query;
       
       if (!date) {
-        return res.status(400).json({ error: 'Date parameter is required' });
+        return res.status(400).json({ success: false, message: 'Date parameter is required' });
       }
 
       // Get all labs with their booking counts for the day
@@ -100,7 +100,7 @@ class TimelineController {
 
     } catch (error) {
       console.error('Error in getDayView:', error);
-      res.status(500).json({ error: 'Failed to fetch day view data' });
+      res.status(500).json({ success: false, message: 'Failed to fetch day view data', error: error.message });
     }
   }
 
@@ -110,7 +110,7 @@ class TimelineController {
       const { start_date, end_date } = req.query;
       
       if (!start_date || !end_date) {
-        return res.status(400).json({ error: 'Start date and end date parameters are required' });
+        return res.status(400).json({ success: false, message: 'Start date and end date parameters are required' });
       }
 
       // Get all active labs
@@ -239,7 +239,7 @@ class TimelineController {
 
     } catch (error) {
       console.error('Error in getWeekView:', error);
-      res.status(500).json({ error: 'Failed to fetch week view data' });
+      res.status(500).json({ success: false, message: 'Failed to fetch week view data', error: error.message });
     }
   }
 
@@ -249,7 +249,7 @@ class TimelineController {
       const { year, month } = req.query;
       
       if (!year || !month) {
-        return res.status(400).json({ error: 'Year and month parameters are required' });
+        return res.status(400).json({ success: false, message: 'Year and month parameters are required' });
       }
 
       // Calculate date range for the month
@@ -397,7 +397,7 @@ class TimelineController {
 
     } catch (error) {
       console.error('Error in getMonthView:', error);
-      res.status(500).json({ error: 'Failed to fetch month view data' });
+      res.status(500).json({ success: false, message: 'Failed to fetch month view data', error: error.message });
     }
   }
 
@@ -408,7 +408,8 @@ class TimelineController {
       
       if (!lab_id || !booking_date || !start_time || !end_time) {
         return res.status(400).json({ 
-          error: 'lab_id, booking_date, start_time, and end_time are required' 
+          success: false, 
+          message: 'lab_id, booking_date, start_time, and end_time are required' 
         });
       }
 
@@ -453,7 +454,7 @@ class TimelineController {
       const [labData] = await db.execute(labQuery, [lab_id]);
 
       if (labData.length === 0) {
-        return res.status(404).json({ error: 'Lab not found or inactive' });
+        return res.status(404).json({ success: false, message: 'Lab not found or inactive' });
       }
 
       // Check if lab is available during the requested time
@@ -514,7 +515,7 @@ class TimelineController {
 
     } catch (error) {
       console.error('Error in checkAvailability:', error);
-      res.status(500).json({ error: 'Failed to check availability' });
+      res.status(500).json({ success: false, message: 'Failed to check availability', error: error.message });
     }
   }
 
@@ -524,7 +525,7 @@ class TimelineController {
       const { start_date, end_date, lab_id } = req.query;
       
       if (!start_date || !end_date) {
-        return res.status(400).json({ error: 'Start date and end date are required' });
+        return res.status(400).json({ success: false, message: 'Start date and end date are required' });
       }
 
       let whereClause = 'WHERE b.booking_date BETWEEN ? AND ?';
@@ -607,7 +608,7 @@ class TimelineController {
 
     } catch (error) {
       console.error('Error in getTimelineAnalytics:', error);
-      res.status(500).json({ error: 'Failed to fetch timeline analytics' });
+      res.status(500).json({ success: false, message: 'Failed to fetch timeline analytics', error: error.message });
     }
   }
 }

@@ -1,0 +1,386 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Tata Motors custom base styles */
+  :root {
+    --color-ocean: #192734;
+    --color-teal: #086E73;
+    --color-teal-light: #62B6CB;
+    --color-tata-red: #E31937;
+    --color-tata-red-dark: #c8102e;
+    --color-cream: #F2E8CF;
+    --color-peach: #E9B8A8;
+    --color-pink-soft: #D9B8C4;
+  }
+
+  * {
+    @apply m-0 p-0 box-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans antialiased min-h-screen text-ocean;
+    background: linear-gradient(135deg, #F2E8CF 0%, #E9B8A8 50%, #D9B8C4 100%);
+  }
+
+  /* Typography */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight;
+  }
+
+  /* Form elements */
+  input, select, textarea {
+    @apply bg-white/90 border-2 border-teal/20 rounded-xl px-4 py-3 
+           focus:border-teal focus:outline-none focus:ring-4 focus:ring-teal/10 
+           transition-all duration-300;
+  }
+
+  input:disabled, select:disabled, textarea:disabled {
+    @apply opacity-50 cursor-not-allowed bg-gray-100;
+  }
+
+  /* Links */
+  a {
+    @apply text-teal hover:text-teal-light transition-colors duration-300;
+  }
+}
+
+@layer components {
+  /* Tata Motors Buttons */
+  .tata-btn {
+    @apply bg-gradient-to-r from-tata-red to-tata-red-dark text-white 
+           font-semibold px-6 py-3 rounded-xl shadow-lg 
+           hover:shadow-xl transform hover:-translate-y-0.5 
+           transition-all duration-300 
+           focus:outline-none focus:ring-4 focus:ring-tata-red/50
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none;
+  }
+
+  .tata-btn-secondary {
+    @apply bg-gradient-to-r from-teal to-teal-light text-white 
+           font-semibold px-6 py-3 rounded-xl shadow-lg 
+           hover:shadow-xl transform hover:-translate-y-0.5 
+           transition-all duration-300 
+           focus:outline-none focus:ring-4 focus:ring-teal/50;
+  }
+
+  .tata-btn-outline {
+    @apply border-2 border-teal text-teal font-semibold 
+           px-6 py-3 rounded-xl 
+           hover:bg-teal hover:text-white 
+           transition-all duration-300
+           focus:outline-none focus:ring-4 focus:ring-teal/20;
+  }
+
+  /* Tata Cards */
+  .tata-card {
+    @apply bg-white/95 backdrop-blur-xl rounded-2xl 
+           border border-white/30 shadow-xl 
+           hover:shadow-2xl transition-all duration-300;
+  }
+
+  .tata-card-hover {
+    @apply hover:transform hover:-translate-y-2 hover:shadow-2xl;
+  }
+
+  /* Status Badges */
+  .status-badge {
+    @apply px-3 py-1 rounded-full text-xs font-bold uppercase;
+  }
+
+  .status-badge-confirmed {
+    @apply bg-gradient-to-r from-teal to-teal-light text-white;
+  }
+
+  .status-badge-pending {
+    @apply bg-gradient-to-r from-yellow-400 to-yellow-500 text-white;
+  }
+
+  .status-badge-cancelled {
+    @apply bg-gradient-to-r from-tata-red to-tata-red-dark text-white;
+  }
+
+  .status-badge-completed {
+    @apply bg-gradient-to-r from-gray-400 to-gray-500 text-white;
+  }
+
+  /* Lab Status */
+  .lab-available {
+    @apply border-2 border-teal bg-gradient-to-br from-teal/5 to-transparent;
+  }
+
+  .lab-booked {
+    @apply border-2 border-tata-red bg-gradient-to-br from-tata-red/5 to-transparent opacity-70;
+  }
+
+  /* Form Groups */
+  .form-group {
+    @apply mb-4;
+  }
+
+  .form-label {
+    @apply block text-sm font-semibold text-ocean mb-2 flex items-center gap-2;
+  }
+
+  .form-error {
+    @apply mt-1 text-sm text-tata-red flex items-center gap-1;
+  }
+
+  /* Tables */
+  .table-container {
+    @apply overflow-x-auto rounded-2xl shadow-lg;
+  }
+
+  .table-header {
+    @apply bg-gradient-to-r from-teal to-teal-light text-white;
+  }
+
+  .table-header th {
+    @apply px-6 py-4 text-left font-semibold;
+  }
+
+  .table-row {
+    @apply border-b border-teal/10 hover:bg-teal/5 transition-colors;
+  }
+
+  .table-row td {
+    @apply px-6 py-4;
+  }
+
+  /* Stats Cards */
+  .stat-card {
+    @apply bg-teal/5 p-6 rounded-2xl border-2 border-teal/20;
+  }
+
+  .stat-number {
+    @apply text-3xl font-bold text-teal;
+  }
+
+  .stat-label {
+    @apply text-sm text-ocean/70;
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply flex items-center gap-2 px-4 py-2 rounded-xl font-medium 
+           transition-all duration-300;
+  }
+
+  .nav-link-active {
+    @apply bg-gradient-to-r from-teal to-teal-light text-white shadow-lg;
+  }
+
+  .nav-link-inactive {
+    @apply text-ocean hover:bg-teal/10 hover:text-teal;
+  }
+
+  /* Animations */
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
+
+  /* Gradients */
+  .gradient-text {
+    @apply bg-gradient-to-r from-teal to-teal-light bg-clip-text text-transparent;
+  }
+
+  .gradient-bg-primary {
+    @apply bg-gradient-to-r from-teal to-teal-light;
+  }
+
+  .gradient-bg-red {
+    @apply bg-gradient-to-r from-tata-red to-tata-red-dark;
+  }
+
+  .gradient-bg-sunset {
+    background: linear-gradient(135deg, #F2E8CF 0%, #E9B8A8 50%, #D9B8C4 100%);
+  }
+
+  /* Loading Spinner */
+  .spinner {
+    @apply relative w-16 h-16;
+  }
+
+  .spinner-ring {
+    @apply absolute inset-0 border-4 border-teal/20 rounded-full;
+  }
+
+  .spinner-ring-primary {
+    @apply absolute inset-0 border-4 border-tata-red rounded-full animate-spin border-t-transparent;
+  }
+
+  /* Toast Customizations */
+  .toast-success {
+    @apply bg-gradient-to-r from-teal to-teal-light text-white;
+  }
+
+  .toast-error {
+    @apply bg-gradient-to-r from-tata-red to-tata-red-dark text-white;
+  }
+
+  /* Modal/Dialog */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50;
+  }
+
+  .modal-content {
+    @apply bg-white/95 backdrop-blur-xl rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl;
+  }
+
+  /* Tooltips */
+  .tooltip {
+    @apply absolute bg-ocean text-white text-sm px-3 py-2 rounded-lg 
+           shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible 
+           transition-all duration-300 z-50;
+  }
+
+  /* Scrollbar */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #086E73 #F2E8CF;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-cream/50 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gradient-to-b from-teal to-teal-light rounded-full;
+  }
+}
+
+@layer utilities {
+  /* Custom animations */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  /* Text shadows */
+  .text-shadow-sm {
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .text-shadow-lg {
+    text-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+
+  /* Box shadows */
+  .shadow-soft {
+    box-shadow: 0 10px 40px -10px rgba(8, 110, 115, 0.2);
+  }
+
+  .shadow-strong {
+    box-shadow: 0 20px 60px -10px rgba(227, 25, 55, 0.3);
+  }
+
+  /* Gradients */
+  .bg-gradient-sunset {
+    background: linear-gradient(135deg, #F2E8CF 0%, #E9B8A8 50%, #D9B8C4 100%);
+  }
+
+  .bg-gradient-ocean {
+    background: linear-gradient(135deg, #086E73 0%, #62B6CB 100%);
+  }
+
+  /* Blur effects */
+  .backdrop-blur-custom {
+    backdrop-filter: blur(20px);
+  }
+
+  /* Line clamp */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Aspect ratios */
+  .aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+
+  .aspect-video {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  .tata-card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  .dark\:bg-ocean-dark {
+    background-color: #0f1a24;
+  }
+
+  .dark\:text-cream {
+    color: #F2E8CF;
+  }
+}

@@ -1,0 +1,1 @@
+const s={START_HOUR:6,START_MINUTE:30,END_HOUR:17,SLOT_INTERVAL:30,MAX_DURATION_MINUTES:630},T={USER:{username:"staff1",password:"user123"},ADMIN:{username:"admin",password:"admin123"}};export{T as D,s as T};

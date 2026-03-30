@@ -1,0 +1,305 @@
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import api from '../api/axios';
+import { useSocket } from './useSocket';
+import toast from 'react-hot-toast';
+
+// Utility: Parse local time string to Date object (treat as local time, not UTC)
+const parseLocalTime = (dateStr, timeStr) => {
+  if (!dateStr || !timeStr) return null;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const date = new Date(dateStr + 'T00:00:00');
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+};
+
+// Utility: Get current local time
+const getCurrentLocalTime = () => new Date();
+
+// Utility: Convert UTC to local time string for display
+const formatLocalTime = (utcDate) => {
+  if (!utcDate) return '';
+  return utcDate.toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: true 
+  });
+};
+
+// Utility: Deduplicate bookings by ID, keeping newest
+const deduplicateBookings = (bookings) => {
+  const seen = new Map();
+  bookings.forEach(booking => {
+    const existing = seen.get(booking.id);
+    if (!existing || (booking.updated_at && existing.updated_at && new Date(booking.updated_at) > new Date(existing.updated_at))) {
+      seen.set(booking.id, booking);
+    }
+  });
+  return Array.from(seen.values());
+};
+
+// Utility: Sort bookings by start time (UTC)
+const sortBookingsByTime = (bookings) => {
+  return [...bookings].sort((a, b) => {
+    const timeA = (a.start_time || '').replace(':', '');
+    const timeB = (b.start_time || '').replace(':', '');
+    return timeA.localeCompare(timeB);
+  });
+};
+
+export const useTimeline = () => {
+  const [bookings, setBookings] = useState([]);
+  const [labs, setLabs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const { socket, connected } = useSocket();
+  
+  // PRODUCTION: Debounce ref for socket events
+  const debounceTimer = useRef(null);
+  const pendingUpdates = useRef([]);
+  
+  // Generate time slots for timeline (06:30 AM - 05:30 PM)
+  const generateTimeSlots = useCallback(() => {
+    const slots = [];
+    const startHour = 6;
+    const endHour = 18;
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      if (hour === 6) {
+        slots.push(`${hour.toString().padStart(2, '0')}:30`);
+      } else if (hour < 18) {
+        slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      }
+      
+      if (hour < 17) {
+        slots.push(`${hour.toString().padStart(2, '0')}:30`);
+      }
+    }
+    
+    return slots;
+  }, []);
+  
+  const timeSlots = useMemo(() => generateTimeSlots(), [generateTimeSlots]);
+  
+  // PRODUCTION: Process pending updates with debouncing
+  const processPendingUpdates = useCallback(() => {
+    if (pendingUpdates.current.length === 0) return;
+    
+    setBookings(prevBookings => {
+      let newBookings = [...prevBookings];
+      
+      pendingUpdates.current.forEach(update => {
+        switch (update.type) {
+          case 'created':
+            if (update.booking.booking_date === selectedDate) {
+              const exists = newBookings.some(b => b.id === update.booking.id);
+              if (!exists) newBookings.push(update.booking);
+            }
+            break;
+          case 'updated':
+            newBookings = newBookings.map(b => 
+              b.id === update.booking.id ? { ...b, ...update.booking } : b
+            );
+            break;
+          case 'cancelled':
+            newBookings = newBookings.filter(b => b.id !== update.bookingId);
+            break;
+        }
+      });
+      
+      pendingUpdates.current = [];
+      return sortBookingsByTime(deduplicateBookings(newBookings));
+    });
+  }, [selectedDate]);
+  
+  // Debounced update handler (150ms)
+  const queueUpdate = useCallback((update) => {
+    pendingUpdates.current.push(update);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => processPendingUpdates(), 150);
+  }, [processPendingUpdates]);
+  
+  // Fetch timeline data for specific date
+  const fetchTimeline = useCallback(async (date = selectedDate) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch all labs
+      const labsResponse = await api.get('/labs', {
+        params: { date }
+      });
+      setLabs(labsResponse.data.labs || []);
+      
+      // Fetch bookings for specific date
+      const bookingsResponse = await api.get('/bookings', {
+        params: {
+          booking_date: date
+        }
+      });
+      
+      let bookingsData = bookingsResponse.data.bookings || [];
+      
+      // Enhance bookings with lab information
+      const labsData = labsResponse.data.labs || [];
+      bookingsData = bookingsData.map(booking => {
+        const lab = labsData.find(l => l.id === booking.lab_id);
+        return {
+          ...booking,
+          lab_name: lab ? lab.name : `Lab ${booking.lab_id}`,
+          building: lab ? lab.building : 'Unknown',
+          user_name: booking.user_name || `User ${booking.user_id}`
+        };
+      });
+      
+      // Sort bookings by start time
+      bookingsData.sort((a, b) => {
+        const timeA = (a.start_time || '').replace(':', '');
+        const timeB = (b.start_time || '').replace(':', '');
+        return timeA.localeCompare(timeB);
+      });
+      
+      // PRODUCTION: Deduplicate and sort
+      setBookings(sortBookingsByTime(deduplicateBookings(bookingsData)));
+      setSelectedDate(date);
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Failed to load timeline data';
+      setError(errorMessage);
+      toast.error('Failed to load timeline');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate]);
+  
+  // PRODUCTION-GRADE: Get booking state using LOCAL time (not UTC)
+  const getBookingState = useCallback((booking) => {
+    const now = getCurrentLocalTime();
+    const bookingStart = parseLocalTime(booking.booking_date, booking.start_time);
+    const bookingEnd = parseLocalTime(booking.booking_date, booking.end_time);
+    
+    if (!bookingStart || !bookingEnd) return 'unknown';
+    
+    if (booking.status === 'cancelled') {
+      return 'cancelled';
+    }
+    
+    if (now >= bookingStart && now < bookingEnd) {
+      return 'active';
+    }
+    
+    if (now < bookingStart) {
+      return 'future';
+    }
+    
+    return 'past';
+  }, []);
+  
+  // Group bookings by lab for timeline rendering
+  const getBookingsByLab = useCallback(() => {
+    const bookingsByLab = {};
+    
+    labs.forEach(lab => {
+      bookingsByLab[lab.id] = [];
+    });
+    
+    bookings.forEach(booking => {
+      if (bookingsByLab[booking.lab_id]) {
+        bookingsByLab[booking.lab_id].push({
+          ...booking,
+          state: getBookingState(booking)
+        });
+      }
+    });
+    
+    return bookingsByLab;
+  }, [labs, bookings, getBookingState]);
+
+  // PRODUCTION-GRADE: Real-time updates with debouncing (150ms)
+  useEffect(() => {
+    if (!socket || !connected || !selectedDate) return;
+
+    const handleBookingCreated = (data) => {
+      if (data.booking?.booking_date === selectedDate) {
+        queueUpdate({ type: 'created', booking: data.booking });
+        toast.info(`New: ${data.booking.lab_name || 'Lab'} ${data.booking.start_time?.slice(0, 5)}`);
+      }
+    };
+
+    const handleBookingUpdated = (data) => {
+      if (data.booking?.booking_date === selectedDate) {
+        queueUpdate({ type: 'updated', booking: data.booking });
+        toast.info(`Updated: ${data.booking.lab_name || 'Lab'}`);
+      }
+    };
+
+    const handleBookingCancelled = (data) => {
+      const bookingDate = data.booking?.booking_date || data.booking_date;
+      if (bookingDate === selectedDate) {
+        queueUpdate({ type: 'cancelled', bookingId: data.booking?.id || data.bookingId });
+        toast.info('Booking cancelled');
+      }
+    };
+
+    const handleTimelineUpdate = (data) => {
+      if (data.booking_date === selectedDate) {
+        if (data.changes) {
+          data.changes.forEach(change => queueUpdate(change));
+        } else {
+          fetchTimeline(selectedDate);
+        }
+      }
+    };
+
+    socket.on('booking-created', handleBookingCreated);
+    socket.on('booking-updated', handleBookingUpdated);
+    socket.on('booking-cancelled', handleBookingCancelled);
+    socket.on('timeline-update', handleTimelineUpdate);
+
+    return () => {
+      socket.off('booking-created', handleBookingCreated);
+      socket.off('booking-updated', handleBookingUpdated);
+      socket.off('booking-cancelled', handleBookingCancelled);
+      socket.off('timeline-update', handleTimelineUpdate);
+      
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, [socket, connected, selectedDate, queueUpdate, fetchTimeline]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
+
+  // Auto-refresh every 60 seconds as fallback
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (selectedDate && !loading) {
+        fetchTimeline(selectedDate);
+      }
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [selectedDate, loading, fetchTimeline]);
+
+  return {
+    bookings,
+    labs,
+    loading,
+    error,
+    selectedDate,
+    timeSlots,
+    fetchTimeline,
+    getBookingsByLab,
+    getBookingState,
+    setSelectedDate,
+    // Expose utilities for components
+    parseUTCTime,
+    formatLocalTime,
+  };
+};

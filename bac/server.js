@@ -20,8 +20,18 @@ app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // Health check
 app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
@@ -54,6 +64,7 @@ async function startServer() {
     const bookingRoutes = require('./src/routes/bookings');
     const adminRoutes = require('./src/admin/routes/admin');
     const analyticsRoutes = require('./src/routes/analytics');
+    const timelineRoutes = require('./src/routes/timeline');
     
     // Use routes
     app.use('/api/auth', authRoutes);
@@ -61,6 +72,7 @@ async function startServer() {
     app.use('/api/bookings', bookingRoutes);
     app.use('/api/admin', adminRoutes);
     app.use('/api/analytics', analyticsRoutes);
+    app.use('/api/timeline', timelineRoutes);
     
     // 404 handler
     app.use('*', (req, res) => {

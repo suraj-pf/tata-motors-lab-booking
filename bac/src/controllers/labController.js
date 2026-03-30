@@ -79,7 +79,7 @@ const getAllLabs = async (req, res) => {
     });
   } catch (error) {
     console.error('Get labs error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -90,13 +90,13 @@ const getLabById = async (req, res) => {
     const lab = await Lab.findById(labId);
     
     if (!lab) {
-      return res.status(404).json({ error: 'Lab not found' });
+      return res.status(404).json({ success: false, message: 'Lab not found' });
     }
 
     res.json({ success: true, lab });
   } catch (error) {
     console.error('Get lab error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -105,12 +105,12 @@ const getLabAvailability = async (req, res) => {
     const { labId, date } = req.query;
     
     if (!labId || !date) {
-      return res.status(400).json({ error: 'labId and date are required' });
+      return res.status(400).json({ success: false, message: 'labId and date are required' });
     }
 
     const lab = await Lab.findById(labId);
     if (!lab) {
-      return res.status(404).json({ error: 'Lab not found' });
+      return res.status(404).json({ success: false, message: 'Lab not found' });
     }
 
     const [bookings] = await pool.execute(
@@ -120,7 +120,7 @@ const getLabAvailability = async (req, res) => {
       [labId, date]
     );
 
-    const { generateTimeSlots } = require('../utils/timeSlots');
+    const { generateTimeSlots } = require('../shared/utils/timeSlots');
     const allSlots = generateTimeSlots();
     
     const availability = allSlots.map(slot => ({
@@ -136,7 +136,7 @@ const getLabAvailability = async (req, res) => {
     });
   } catch (error) {
     console.error('Get availability error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -151,7 +151,7 @@ const getBuildings = async (req, res) => {
     });
   } catch (error) {
     console.error('Get buildings error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

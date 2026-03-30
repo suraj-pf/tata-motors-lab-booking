@@ -5,7 +5,7 @@ const { loginLimiter, createAccountLimiter } = require('../shared/middleware/rat
 const router = express.Router();
 
 router.post('/register', createAccountLimiter, register);
-router.post('/login', loginLimiter, login);
+router.post('/login', login);
 router.post('/refresh', refreshToken);
 router.get('/profile', authMiddleware, getProfile);
 router.put('/profile', authMiddleware, updateProfile);

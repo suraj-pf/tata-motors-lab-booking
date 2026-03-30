@@ -42,32 +42,56 @@ const register = async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Registration failed', 
+      error: error.message 
+    });
   }
 };
 
 const login = async (req, res) => {
   try {
+    console.log('🔍 Login attempt:', req.body);
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+      console.log('❌ Missing credentials');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username and password required' 
+      });
     }
 
+    console.log('🔍 Querying user:', username);
     const [users] = await pool.execute(
       'SELECT * FROM users WHERE username = ? AND is_active = TRUE',
       [username]
     );
 
+    console.log('🔍 Found users:', users.length, users[0]?.username, 'Active:', users[0]?.is_active);
+
     if (users.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      console.log('❌ No user found or inactive');
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid credentials' 
+      });
     }
 
     const user = users[0];
+    console.log('🔍 Comparing password for user:', user.username);
+    console.log('🔍 Received password:', password);
+    console.log('🔍 Stored hash:', user.password_hash);
     const isValid = await comparePassword(password, user.password_hash);
+    console.log('🔍 Password valid:', isValid);
     
     if (!isValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      console.log('❌ Password comparison failed');
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid credentials' 
+      });
     }
 
     const tokens = generateTokens(user);
@@ -88,7 +112,11 @@ const login = async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Login failed', 
+      error: error.message 
+    });
   }
 };
 
@@ -97,7 +125,10 @@ const refreshToken = async (req, res) => {
     const { refresh_token } = req.body;
 
     if (!refresh_token) {
-      return res.status(400).json({ error: 'Refresh token required' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Refresh token required' 
+      });
     }
 
     const decoded = verifyRefreshToken(refresh_token);
@@ -108,7 +139,10 @@ const refreshToken = async (req, res) => {
     );
 
     if (users.length === 0) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
     }
 
     const tokens = generateTokens(users[0]);
@@ -119,7 +153,11 @@ const refreshToken = async (req, res) => {
     });
   } catch (error) {
     console.error('Refresh token error:', error);
-    res.status(401).json({ error: 'Invalid refresh token' });
+    res.status(401).json({ 
+      success: false, 
+      message: 'Invalid refresh token', 
+      error: error.message 
+    });
   }
 };
 
@@ -131,7 +169,10 @@ const getProfile = async (req, res) => {
     );
 
     if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
     }
 
     res.json({
@@ -140,7 +181,11 @@ const getProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('Profile error:', error);
-    res.status(500).json({ error: 'Failed to fetch profile' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch profile', 
+      error: error.message 
+    });
   }
 };
 
@@ -155,7 +200,10 @@ const updateProfile = async (req, res) => {
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
     }
 
     const [updatedUser] = await pool.execute(
@@ -170,7 +218,11 @@ const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('Update profile error:', error);
-    res.status(500).json({ error: 'Failed to update profile' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update profile', 
+      error: error.message 
+    });
   }
 };
 
@@ -181,13 +233,15 @@ const changePassword = async (req, res) => {
 
     if (!current_password || !new_password) {
       return res.status(400).json({ 
-        error: 'Current password and new password are required' 
+        success: false, 
+        message: 'Current password and new password are required' 
       });
     }
 
     if (new_password.length < 6) {
       return res.status(400).json({ 
-        error: 'New password must be at least 6 characters' 
+        success: false, 
+        message: 'New password must be at least 6 characters' 
       });
     }
 
@@ -198,13 +252,19 @@ const changePassword = async (req, res) => {
     );
 
     if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
     }
 
     // Verify current password
     const isValid = await comparePassword(current_password, users[0].password_hash);
     if (!isValid) {
-      return res.status(400).json({ error: 'Current password is incorrect' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Current password is incorrect' 
+      });
     }
 
     // Hash new password
@@ -222,7 +282,11 @@ const changePassword = async (req, res) => {
     });
   } catch (error) {
     console.error('Change password error:', error);
-    res.status(500).json({ error: 'Failed to change password' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to change password', 
+      error: error.message 
+    });
   }
 };
 
