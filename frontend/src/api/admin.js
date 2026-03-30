@@ -2,6 +2,8 @@ import api from './axios'
 
 export const adminApi = {
   getAnalytics: (params) => api.get('/admin/analytics', { params }),
+  getFullAnalytics: () => api.get('/analytics/full'),
+  getRealtimeMetrics: () => api.get('/analytics/realtime'),
   getAllBookings: (params) => api.get('/admin/bookings', { params }),
   updateBookingStatus: (id, statusData) => api.patch(`/admin/bookings/${id}`, statusData),
   autoCompleteExpiredBookings: () => api.post('/admin/bookings/auto-complete'),

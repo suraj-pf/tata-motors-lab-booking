@@ -15,6 +15,7 @@ const MyBookings = lazy(() => import('./pages/MyBookings'))
 const BookingCreate = lazy(() => import('./pages/BookingCreate'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const ProfessionalDashboard = lazy(() => import('./pages/ProfessionalDashboard'))
+const RealtimeAnalyticsDashboard = lazy(() => import('./pages/RealtimeAnalyticsDashboard'))
 const Admin = lazy(() => import('./pages/Admin'))
 const LabMap = lazy(() => import('./pages/LabMap'))
 const BookingSuccessPage = lazy(() => import('./pages/BookingSuccessPage'))
@@ -49,6 +50,7 @@ function App() {
               <Route element={<PrivateRoute requiredRole="admin" />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/professional-dashboard" element={<ProfessionalDashboard />} />
+                <Route path="/realtime-analytics" element={<RealtimeAnalyticsDashboard />} />
                 <Route path="/admin" element={<Admin />} />
               </Route>
               

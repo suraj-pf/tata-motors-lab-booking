@@ -262,6 +262,10 @@ const createBooking = async (req, res) => {
       }
     });
 
+    // Trigger analytics update broadcast
+    const { broadcastAnalyticsUpdate } = require('../controllers/analyticsController');
+    broadcastAnalyticsUpdate().catch(err => console.error('[ANALYTICS BROADCAST ERROR]:', err));
+
     res.status(201).json({ 
       success: true, 
       message: 'Booking created successfully',
@@ -527,6 +531,10 @@ const cancelBooking = async (req, res) => {
         }
       });
     }
+
+    // Trigger analytics update broadcast
+    const { broadcastAnalyticsUpdate } = require('../controllers/analyticsController');
+    broadcastAnalyticsUpdate().catch(err => console.error('[ANALYTICS BROADCAST ERROR]:', err));
 
     res.json({ 
       success: true, 
@@ -860,6 +868,10 @@ const updateBooking = async (req, res) => {
     emitToLab(booking[0].lab_id, 'booking-updated', updatedBooking[0]);
     emitToUser(booking[0].user_id, 'booking-updated', updatedBooking[0]);
 
+    // Trigger analytics update broadcast
+    const { broadcastAnalyticsUpdate } = require('../controllers/analyticsController');
+    broadcastAnalyticsUpdate().catch(err => console.error('[ANALYTICS BROADCAST ERROR]:', err));
+
     console.log(`[BOOKING UPDATED] ID: ${bookingId}, User: ${req.user.id}`);
 
     res.json({ 
@@ -1022,6 +1034,10 @@ const approveBooking = async (req, res) => {
     } else {
       emitToUser(bookingData.user_id, 'booking-rejected', responseBooking);
     }
+
+    // Trigger analytics update broadcast
+    const { broadcastAnalyticsUpdate } = require('../controllers/analyticsController');
+    broadcastAnalyticsUpdate().catch(err => console.error('[ANALYTICS BROADCAST ERROR]:', err));
 
     console.log(`[BOOKING ${approved ? 'APPROVED' : 'REJECTED'}] ID: ${bookingId}, Admin: ${req.user.id}`);
 
